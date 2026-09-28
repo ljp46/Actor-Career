@@ -1,0 +1,84 @@
+name: Build Historical Database
+
+on:
+  schedule:
+    - cron: '17 4 1 */3 *'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Catalogue scope
+        required: true
+        default: hollywood
+        type: choice
+        options:
+          - hollywood
+          - worldwide
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      years: ${{ steps.years.outputs.years }}
+    steps:
+      - name: Check TMDB credential
+        env:
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+        run: |
+          if [ -z "$TMDB_TOKEN" ]; then
+            echo "::error::Add a repository Actions secret named TMDB_TOKEN containing your TMDB API Read Access Token."
+            exit 1
+          fi
+      - id: years
+        name: Build year matrix
+        run: echo 'years=[1960,1961,1962,1963,1964,1965,1966,1967,1968,1969,1970,1971,1972,1973,1974,1975,1976,1977,1978,1979,1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026]' >> "$GITHUB_OUTPUT"
+
+  import-year:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        year: ${{ fromJSON(needs.prepare.outputs.years) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Import ${{ matrix.year }}
+        env:
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+        run: python scripts/import_tmdb.py --start ${{ matrix.year }} --end ${{ matrix.year }} --scope ${{ github.event.inputs.scope || 'hollywood' }} --force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-${{ matrix.year }}
+          path: data/years/${{ matrix.year }}.json
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: import-year
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: historical-*
+          path: data/years
+          merge-multiple: true
+      - name: Build compact manifest
+        run: python scripts/build_manifest.py
+      - name: Commit catalogue
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/years
+          git diff --cached --quiet && exit 0
+          git commit -m "Build complete historical catalogue"
+          git push
