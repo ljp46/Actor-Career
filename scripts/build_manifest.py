@@ -2,6 +2,7 @@
 """Rebuild the lightweight year/opportunity manifest from imported year shards."""
 import json
 import pathlib
+import datetime as dt
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 YEARS = ROOT / "data" / "years"
@@ -27,6 +28,37 @@ def genders_for_role(role):
     return ("male", "female", "nonbinary")
 
 
+def casting_start_year(project):
+    """Match the browser's estimated schedule for the opportunity preview."""
+    release = project.get("releaseDate")
+    try:
+        release_date = dt.date.fromisoformat(release) if release else None
+    except ValueError:
+        release_date = None
+    if release_date is None:
+        value = 2166136261
+        for char in project["id"]:
+            value = ((value ^ ord(char)) * 16777619) & 0xFFFFFFFF
+        release_date = dt.date(int(project["year"]), 6 + value % 6, 15)
+    big = (project.get("voteCount") or 0) >= 1000 or (project.get("popularity") or 0) >= 80
+    tv = project.get("kind") == "TV series"
+    duration = (22 if big else 14) if tv else (22 if big else 10)
+    gap = 10 if tv else (30 if big else 20)
+    try:
+        filming_end = dt.date.fromisoformat(project["filmingEndDate"])
+    except (KeyError, ValueError):
+        filming_end = release_date - dt.timedelta(weeks=gap)
+    try:
+        filming_start = dt.date.fromisoformat(project["filmingStartDate"])
+    except (KeyError, ValueError):
+        filming_start = filming_end - dt.timedelta(weeks=duration)
+    try:
+        casting_start = dt.date.fromisoformat(project["castingStartDate"])
+    except (KeyError, ValueError):
+        casting_start = filming_start - dt.timedelta(weeks=26 if big else 20)
+    return casting_start.year
+
+
 def main():
     years = []
     opportunities = {}
@@ -38,7 +70,7 @@ def main():
         years.append(year)
         for project in payload.get("projects", []):
             totals["projects"] += 1
-            casting_year = int(project.get("castingYear", project["year"] - 1))
+            casting_year = casting_start_year(project)
             delta = int(project["year"]) - casting_year
             year_bucket = opportunities.setdefault(str(casting_year), {})
             for role in project.get("roles", []):

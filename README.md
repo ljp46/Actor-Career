@@ -30,7 +30,13 @@ Age remains flexible rather than exact: an adult actor can still have a strong f
 
 The World tab shows productions around the current year even when the player is not involved. It supports search across productions, actors, characters and directors/creators and paginates results for mobile performance. Save-specific cast changes are displayed in place of real history while retaining the original performer underneath.
 
-Casting years and playing-age windows are game abstractions unless an imported source explicitly provides better production timing. They should not be read as claims about the exact historical audition date.
+Casting opens before a shoot and closes when filming begins. TMDB provides release/first-air dates, but the bulk catalogue does not provide reliable filming windows. The game estimates a 10–22 week shoot according to format and project scale, places it ahead of release, then opens casting 20–26 weeks beforehand. These dates are labelled **estimated** in the game and are not historical filming claims. An explicit `filmingStartDate`, `filmingEndDate`, or `castingStartDate` in a project can override the estimate.
+
+Time advances in seven-day steps. A won part is booked, enters filming, pays at wrap, and gains release fame only when audiences can see it. Overlapping shoots block conflicting auditions. Existing monthly saves open on the last day of their saved month and retain their existing career credits and money.
+
+The People screen exposes credited co-stars once a part is booked. During filming, you can hang out between takes; adult characters can build chemistry, date, and suggest a consensual off-screen hookup. Interactions are fictional and limited by weekly social time. Rest, exercise, going out, and acting practice use separate weekly activity slots. The World screen shows the full imported named cast; crew credits are displayed when present in a shard. The importer's crew field will appear on a future rebuild, because an already running workflow keeps the script version it started with.
+
+Imported TV entries currently use series launch data and series-level credits. Season-specific filming, guest roles, and joining or leaving the cast in later seasons need a separate season data pass.
 
 ## Future timeline
 
