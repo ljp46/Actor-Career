@@ -1,6 +1,6 @@
 # Second Take
 
-A mobile-first, offline-capable prototype for an alternate-history actor life sim. Start on your fourth birthday, audition for sampled historical roles, change your save's cast, build family and relationships, spend your earnings, and continue into procedurally generated future years. Dating-app introductions appear from 2012 onward for adult characters.
+A mobile-first, offline-capable prototype for an alternate-history actor life sim. Start on your fourth birthday, audition for sampled historical roles, change your save's cast, follow the surrounding industry, build family and relationships, spend your earnings, and continue into procedurally generated future years. Dating-app introductions appear from 2012 onward for adult characters.
 
 ## Play locally
 
@@ -13,7 +13,7 @@ Open `http://localhost:8080`. All gameplay works without a build step. On GitHub
 
 ## Current scope
 
-`data/sample.json` contains 23 hand-curated, recognizable real-film examples, not the entire historical film/TV database. The catalogue records release year and leading cast; audition windows and age ranges are game rules, not historical claims. The UI does not claim completeness. The long-form TMDB ingestion route is documented in `data/IMPORT.md` and implemented in `scripts/import_tmdb.py`. Year shards listed in `data/years/index.json` load as the game reaches them. Do not commit an API token or embed it in client-side JavaScript.
+`data/sample.json` contains 39 hand-curated, recognizable real-film examples, not the entire historical film/TV database. The catalogue records release year and selected cast; casting years, audition windows, character ages, and playing-age ranges are game rules or approximations rather than historical production claims. The New Life screen previews suitable child-role auditions across the first six playable years. The World tab exposes casting, filming and release activity, directors, current casts and timeline replacements. Do not commit an API token or embed it in client-side JavaScript.
 
 The save holds per-project cast and director overrides, family, relationships, filmography, and future procedural projects. Real baseline data is never mutated. Future years create three projects yearly and new names are checked against a persistent registry. Browser quota and device performance are finite, so “without limit” means no fixed in-game ending; periodic save compaction, historical data shards, and performance work are needed for centuries-long play.
 
