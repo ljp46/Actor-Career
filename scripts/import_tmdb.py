@@ -7,6 +7,7 @@ from TMDB_TOKEN and are never written to disk.
 """
 import argparse
 import datetime as dt
+import http.client
 import json
 import os
 import pathlib
@@ -40,7 +41,7 @@ def request(path, **params):
             retry_after = error.headers.get("Retry-After")
             pause = float(retry_after) if retry_after else min(45, 2 ** attempt + 1)
             time.sleep(pause)
-        except urllib.error.URLError:
+        except (urllib.error.URLError, http.client.HTTPException, TimeoutError, ConnectionError):
             if attempt == 6:
                 raise
             time.sleep(min(30, 2 ** attempt + 1))
@@ -258,7 +259,7 @@ def main():
                         project = convert(kind, summary, year, cache, args.cast_limit)
                         if project:
                             projects.append(project)
-                    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+                    except (urllib.error.HTTPError, urllib.error.URLError, http.client.HTTPException, TimeoutError, ConnectionError) as exc:
                         print(f"Skipped {kind} {item_id}: {exc}")
 
         projects.sort(key=lambda p: (-float(p.get("popularity") or 0), p["title"]))

@@ -1,0 +1,36 @@
+name: Preserve and Recover Historical Database
+
+on:
+  push:
+    branches: [maintenance/catalogue-recovery]
+    paths:
+      - .github/workflows/recover-historical-database.yml
+      - scripts/recover_catalogue.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: historical-database-recovery
+  cancel-in-progress: false
+
+jobs:
+  preserve-and-recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: maintenance/catalogue-recovery
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve completed files and recover failed years
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+          SOURCE_RUN_ID: '36386406355'
+        run: python scripts/recover_catalogue.py
