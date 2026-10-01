@@ -226,6 +226,8 @@ def main():
         help="0 means every credited cast role with a character name.",
     )
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--month", type=int, choices=range(1, 13),
+                        help="Import one month into a durable recovery chunk, not a complete year.")
     args = parser.parse_args()
 
     if not TOKEN:
@@ -234,14 +236,19 @@ def main():
         parser.error("Use years 1960–2026.")
     if args.max_pages < 0 or args.max_pages > 500 or args.cast_limit < 0:
         parser.error("max-pages must be 0–500 and cast-limit must be 0 or greater.")
+    if args.month and (args.start != args.end or args.max_pages or args.cast_limit):
+        parser.error("Monthly recovery requires one year and unlimited pages/cast.")
 
     out = ROOT / "data" / "years"
     out.mkdir(parents=True, exist_ok=True)
     cache_path = ROOT / ".cache" / "tmdb-people.json"
     cache = load_cache(cache_path)
+    if args.month:
+        out = ROOT / "data" / "recovery" / str(args.start)
+        out.mkdir(parents=True, exist_ok=True)
 
     for year in range(args.start, args.end + 1):
-        path = out / f"{year}.json"
+        path = out / (f"{args.month:02d}.json" if args.month else f"{year}.json")
         if path.exists() and not args.force:
             print(f"{year}: already exists (use --force to rebuild)")
             continue
@@ -249,6 +256,8 @@ def main():
         projects, seen = [], set()
         for kind in ("movie", "tv"):
             for start, end in date_windows(year):
+                if args.month and start.month != args.month:
+                    continue
                 for summary in discover_range(kind, start, end, args.scope, args.max_pages):
                     item_id = summary.get("id")
                     key = (kind, item_id)
@@ -260,6 +269,8 @@ def main():
                         if project:
                             projects.append(project)
                     except (urllib.error.HTTPError, urllib.error.URLError, http.client.HTTPException, TimeoutError, ConnectionError) as exc:
+                        if args.month and not (isinstance(exc, urllib.error.HTTPError) and exc.code in (404, 410)):
+                            raise
                         print(f"Skipped {kind} {item_id}: {exc}")
 
         projects.sort(key=lambda p: (-float(p.get("popularity") or 0), p["title"]))
@@ -270,10 +281,14 @@ def main():
             "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
             "projects": projects,
         }
-        path.write_text(
+        if args.month:
+            payload.update({"month": args.month, "complete": True, "batchVersion": 1})
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(
             json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
+        temporary.replace(path)
         save_cache(cache_path, cache)
         print(year, len(projects), sum(len(p["roles"]) for p in projects), path)
 

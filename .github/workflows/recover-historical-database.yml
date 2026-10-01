@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/recover-historical-database.yml
       - scripts/recover_catalogue.py
+      - scripts/recover_months.py
+      - scripts/import_tmdb.py
   workflow_dispatch:
 
 permissions:
@@ -16,10 +18,16 @@ concurrency:
   group: historical-database-recovery
   cancel-in-progress: false
 
+env:
+  SOURCE_RUN_ID: '36386406355'
+
 jobs:
-  preserve-and-recover:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 30
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_work: ${{ steps.plan.outputs.has_work }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,9 +36,58 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Preserve completed files and recover failed years
+      - name: Preserve new successes from the original run
         env:
           GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/recover_catalogue.py --snapshot-only
+      - name: Restore recovery tools after snapshot checkout
+        run: git checkout maintenance/catalogue-recovery
+      - name: Check recovery tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - id: plan
+        name: Plan only missing months of failed years
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/recover_months.py prepare
+
+  recover-month:
+    needs: prepare
+    if: needs.prepare.outputs.has_work == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 270
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: maintenance/catalogue-recovery
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recover and commit one month
+        env:
           TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
-          SOURCE_RUN_ID: '36386406355'
-        run: python scripts/recover_catalogue.py
+          RECOVERY_YEAR: ${{ matrix.year }}
+          RECOVERY_MONTH: ${{ matrix.month }}
+        run: python scripts/recover_months.py import
+
+  preserve-latest:
+    needs: [prepare, recover-month]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: maintenance/catalogue-recovery
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve further original-run successes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/recover_catalogue.py --snapshot-only

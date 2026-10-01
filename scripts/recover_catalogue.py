@@ -2,9 +2,10 @@
 """Preserve completed artifacts from one historical import; retry failed years.
 
 The source run continues untouched. Only the dedicated backup branch receives
-catalogue data. Run on the recovery branch with GITHUB_TOKEN and, for retries, TMDB_TOKEN.
+catalogue data. Run on main with GITHUB_TOKEN and, for retries, TMDB_TOKEN.
 """
 import http.client
+import argparse
 import io
 import json
 import os
@@ -98,6 +99,9 @@ def git(*args, capture=False):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--snapshot-only", action="store_true")
+    args = parser.parse_args()
     repo = os.environ["GITHUB_REPOSITORY"]
     token = os.environ["GITHUB_TOKEN"]
     run_id = int(os.environ["SOURCE_RUN_ID"])
@@ -136,7 +140,7 @@ def main():
         for page in range(1, 20):
             data = github_get(f"{api}/artifacts?per_page=100&page={page}", token)
             artifacts = data["artifacts"]
-            for artifact in artifacts:
+            for artifact in sorted(artifacts, key=lambda item: item.get("expires_at", "")):
                 match = re.fullmatch(r"historical-(\d{4})", artifact["name"])
                 if not match:
                     continue
@@ -152,6 +156,8 @@ def main():
                 temporary.replace(out / f"{year}.json")
                 saved.add(year)
                 print(f"Preserved {year}", flush=True)
+                if len(saved) % 5 == 0:
+                    commit_backup()
             if len(artifacts) < 100:
                 break
         commit_backup()
@@ -170,7 +176,7 @@ def main():
             break
     retry_errors = []
     # Limit repairs per invocation; the hourly workflow will pick up others.
-    for year in sorted((failed & YEARS) - saved)[:1]:
+    for year in ([] if args.snapshot_only else sorted((failed & YEARS) - saved)[:1]):
         if not os.environ.get("TMDB_TOKEN"):
             raise RuntimeError("TMDB_TOKEN is required to recover failed years")
         print(f"Recovering {year} with network retries", flush=True)
@@ -189,7 +195,7 @@ def main():
         with open(summary, "a", encoding="utf-8") as file:
             file.write(f"## Historical database recovery\n\nPreserved **{len(saved)}/67 years** on `{backup}`.\n\n")
             file.write(f"Missing years: {', '.join(map(str, missing)) or 'none'}.\n\n")
-            file.write("The original import and gameplay branch remain separate. Full coverage is ready for catalogue publication.\n" if not missing else "This one-time recovery preserves every file currently available; run again to collect later completions.\n")
+            file.write("The original import and gameplay branch remain separate. Full coverage is ready for catalogue publication.\n" if not missing else "This run preserves files currently available; later runs collect new completions.\n")
     if retry_errors:
         raise RuntimeError(f"Years still needing recovery: {retry_errors}")
 
