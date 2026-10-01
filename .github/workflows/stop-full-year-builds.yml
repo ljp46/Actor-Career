@@ -1,0 +1,34 @@
+name: Stop Superseded Full-Year Builds
+
+on:
+  push:
+    branches: [maintenance/catalogue-recovery]
+    paths:
+      - .github/workflows/stop-full-year-builds.yml
+      - scripts/stop_full_year_builds.py
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  stop-and-preserve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: maintenance/catalogue-recovery
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Stop only the superseded builds and pause their schedule
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/stop_full_year_builds.py
+      - name: Preserve any final completed year files
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: '36386406355'
+        run: python scripts/recover_catalogue.py --snapshot-only

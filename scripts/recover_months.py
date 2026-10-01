@@ -59,21 +59,14 @@ def remote_content(branch, path):
 
 def prepare(repo, token, run_id, branch):
     command("git", "fetch", "origin", f"{branch}:refs/remotes/origin/{branch}")
-    failed = set()
-    for page in range(1, 20):
-        result = github_get(f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs?per_page=100&page={page}", token)
-        for job in result["jobs"]:
-            match = re.fullmatch(r"import-year \((\d{4})\)", job["name"])
-            if match and job["conclusion"] in ("failure", "cancelled"):
-                failed.add(int(match.group(1)))
-        if len(result["jobs"]) < 100:
-            break
+    missing_years = []
     batches = []
-    for year in sorted(failed):
+    for year in range(1960, 2027):
         complete = remote_content(branch, f"data/years/{year}.json")
         if complete is not None:
             validate_year(complete, year)
             continue
+        missing_years.append(year)
         for month in range(1, 13):
             raw = remote_content(branch, f"data/recovery/{year}/{month:02d}.json")
             if raw is not None:
@@ -83,7 +76,7 @@ def prepare(repo, token, run_id, branch):
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"has_work={'true' if batches else 'false'}\n")
         output.write("matrix=" + json.dumps({"include": batches}, separators=(",", ":")) + "\n")
-    print(f"Recovery plan: {len(batches)} missing months across failed years {sorted(failed)}", flush=True)
+    print(f"Recovery plan: {len(batches)} missing months across remaining years {missing_years}", flush=True)
 
 
 def save_chunk(branch, year, month, raw):

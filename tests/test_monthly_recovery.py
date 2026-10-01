@@ -73,8 +73,9 @@ class MonthlyRecoveryTests(unittest.TestCase):
         saved_year = json.dumps({"year": 1965, "source": "TMDB", "scope": "hollywood",
                                 "projects": [{"id": "a", "year": 1965, "roles": []}]})
         def existing(branch, path):
-            if path == "data/years/1965.json":
-                return saved_year
+            if path.startswith("data/years/") and path != "data/years/2013.json":
+                year = int(path.rsplit('/', 1)[1][:4])
+                return saved_year.replace('1965', str(year))
             if path == "data/recovery/2013/01.json":
                 return chunk(1).decode()
             return None

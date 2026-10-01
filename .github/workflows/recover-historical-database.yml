@@ -45,7 +45,7 @@ jobs:
       - name: Check recovery tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
       - id: plan
-        name: Plan only missing months of failed years
+        name: Plan all remaining months, skipping saved years and chunks
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/recover_months.py prepare
