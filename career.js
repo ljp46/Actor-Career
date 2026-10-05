@@ -186,7 +186,7 @@ export function onSetAction(s,catalogue,projectId,kind){
 export function resolveProductionEvent(s,id,choice){
  ensureCareer(s);const event=s.productionEvents.find(e=>e.id===id&&e.personId===s.activeId&&e.status==='open');if(!event)throw Error('This on-set moment has passed.');
  if(!['cooperate','pushback','rest'].includes(choice))throw Error('Unknown response.');
- const credit=s.filmography.find(f=>f.personId===s.activeId&&f.projectId===event.projectId);if(!credit)throw Error('This production is unavailable.');
+ const credit=s.filmography.find(f=>f.personId===s.activeId&&f.projectId===event.projectId&&f.status==='filming');if(!credit)throw Error('This production is no longer filming.');
  event.status='resolved';credit.performance??={effort:0,teamwork:0,pressure:0};
  if(choice==='cooperate'){s.health=clamp(s.health-8,0,100);credit.performance.effort=clamp(credit.performance.effort+5,0,40);credit.performance.pressure+=3;log(s,'A difficult filming day','You agree to the extra demands. The work advances, but the pressure takes a toll.')}
  else if(choice==='pushback'){s.health=clamp(s.health+2,0,100);credit.performance.teamwork=clamp(credit.performance.teamwork+4,0,30);log(s,'Setting a boundary','You push back on the unreasonable request. Some colleagues support you; the studio remembers the disagreement.')}
@@ -241,6 +241,7 @@ export function careerTick(s,catalogue,data){
  const profile=careerProfile(s);
  if(profile.agent&&(!profile.lastAutomaticSearch||date>=datePlus(profile.lastAutomaticSearch,28))){profile.lastAutomaticSearch=date;if(pendingOffers(s).length<4&&profile.lastSearch!==date)searchAgentOffers(s,catalogue)}
  // Closed career records retain outcomes without growing the active UI forever.
+ for(const event of s.productionEvents)if(event.status==='open'&&!s.filmography.some(f=>f.personId===event.personId&&f.projectId===event.projectId&&f.status==='filming'))event.status='expired';
  s.productionEvents=s.productionEvents.filter(e=>e.status==='open'||e.createdOn>=datePlus(date,-60));
  s.careerAuditions=s.careerAuditions.filter(a=>a.status==='callback'||a.expiresOn>=datePlus(date,-60));
  s.roleOffers=s.roleOffers.filter(o=>o.status==='offered'||o.expiresOn>=datePlus(date,-60));

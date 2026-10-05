@@ -35,7 +35,19 @@ New lives accept a birth date (1900–2100) and an independent starting date (19
 
 Settings → Cheats has separate buttons to maximise acting, drama and comedy. Select one known person or all known castmates, then separately maximise friendship, professional respect or romantic chemistry. Romantic chemistry retains adult and family restrictions; it does not automatically create a dating relationship. Cheats save immediately and do not consume weekly activities.
 
-Each eligible audition also has a **Force win (cheat)** button. It guarantees that specific role using the normal booking, filming, payment and release flow. **Attend audition** retains the normal weighted chance; using the cheat does not change future auditions. Casting windows, age/gender fit and shoot conflicts still apply.
+Each eligible audition also has a **Force win (cheat)** button. In v1.2 this guarantees a non-binding offer for that specific role; explicitly accept it to book the shoot. **Attend audition** retains normal chance-based shortlisting and callbacks. Casting windows, age/gender fit and shoot conflicts still apply.
+
+## v1.2: career choices and franchise commitments
+
+Rehearse scripts or pay for coaching before auditions and callbacks. Choose an agent, compare competing offers, negotiate fees and decide which shoot to accept. Agents earn commission on agreed fees at wrap; changing representation does not erase an existing commission agreement.
+
+On set, balance extra rehearsal, cast teamwork and recovery. Fictional production dilemmas can create difficult working conditions. Performance and simulated audience reception affect professional reputation and fame; these outcomes are alternate-history gameplay, not claims about real films or people.
+
+TMDB collections link real film franchises. Optional multi-film deals reserve up to two future appearances of the same uniquely matched, named character, using original full-cast role indices. Returns are binding and do not require new auditions: honour the offer or leave the contract. Refusal or missed deadlines reduce reputation and affect future audition prospects. Poor reception, script concerns and unfair demands can make leaving worthwhile.
+
+The compact startup index contains recurring character links only. Excluded franchise productions are fetched individually when needed for a signed return, rather than loading the complete archive. Ordinary auditions still use the curated 100-film/30-TV yearly selection. Long-gap revivals, same-title remakes and ambiguous character matches are not promised as contract returns.
+
+Full TV-season continuity, character write-offs and fan-driven changes remain planned for v1.3. Relationship redesign is deferred. Existing v1 saves migrate in place; already released credits do not receive retroactive performance rewards.
 
 ## Living world
 

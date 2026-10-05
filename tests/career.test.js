@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCareer,available,advance,generatedYear,projectSchedule,applyCheat} from '../engine.js';
+import {createCareer,available,advance,generatedYear,projectSchedule,applyCheat,familyCasting} from '../engine.js';
 import {ensureCareer,careerProfile,prepareAudition,startAudition,attendCallback,pendingOffers,acceptCareerOffer,declineCareerOffer,negotiateOffer,hireAgent,searchAgentOffers,franchisePlan,reservations,terminateContract,careerTick,onSetAction,resolveProductionEvent,characterKey} from '../career.js';
 
 const role={actor:'Historical Star',character:'Alex Vale',gender:'male',birthYear:1980,characterAge:21,ageMin:18,ageMax:30};
@@ -9,6 +9,20 @@ const first=film('first',2001),second=film('second',2003),third=film('third',200
 const catalogue=[first,second,third];
 const make=()=>{const s=createCareer({name:'Player',birthday:'1980-01-01',startDate:'2000-01-01',gender:'male'},catalogue);ensureCareer(s);return s};
 const forceOffer=(s,p=first,c=catalogue)=>startAudition(s,c,p,0,{forceWin:true}).offer;
+
+test('background family casting respects contract reservations and pending decisions',()=>{
+ for(let seed=0;seed<50;seed++){
+  const s=make();acceptCareerOffer(s,catalogue,forceOffer(s).id,data,{multiFilm:true});s.people.push({id:'family-actor',name:'Family Actor',relative:'Sibling',occupation:'Actor',birthYear:1980,gender:'male',alive:true});
+  s.rng=seed*40000000;familyCasting(s,catalogue,2003);assert.equal(s.casts['second:0'],undefined);
+  const other=make();forceOffer(other);other.people.push({id:'family-actor',name:'Family Actor',relative:'Sibling',occupation:'Actor',birthYear:1980,gender:'male',alive:true});other.rng=seed*40000000;familyCasting(other,catalogue,2001);assert.equal(other.casts['first:0'],undefined);
+ }
+});
+
+test('wrapped productions cannot keep an open on-set dilemma',()=>{
+ const s=make(),credit=acceptCareerOffer(s,catalogue,forceOffer(s).id,data).credit;
+ credit.status='post-production';s.productionEvents.push({id:'old-event',projectId:first.id,personId:s.activeId,status:'open',createdOn:s.date});
+ assert.throws(()=>resolveProductionEvent(s,'old-event','rest'),/no longer filming/);careerTick(s,catalogue,data);assert.equal(s.productionEvents[0].status,'expired');
+});
 
 test('force win is a guaranteed but non-binding offer until accepted',()=>{
  const s=make(),o=forceOffer(s);assert.equal(s.filmography.length,0);assert.equal(s.money,0);assert.equal(s.casts['first:0'],undefined);

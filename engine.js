@@ -126,6 +126,11 @@ export function lifestyle(s,kind){
 }
 export function familyCasting(s,catalogue,year){
  const family=s.people.filter(p=>p.relative&&p.relative!=='Self'&&p.alive),projects=[...catalogue,...s.projects].filter(p=>p.year===year);
+ const reserved=new Set([
+  ...(s.contracts||[]).filter(c=>c.status==='active').flatMap(c=>c.entries.filter(e=>['reserved','offered','booked'].includes(e.status)).map(e=>`${e.project.id}:${e.index}`)),
+  ...(s.roleOffers||[]).filter(o=>o.status==='offered').map(o=>`${o.projectId}:${o.index}`),
+  ...(s.careerAuditions||[]).filter(a=>a.status==='callback').map(a=>`${a.projectId}:${a.index}`)
+ ]);
  for(const f of family){
   if(f.occupation==='Director'&&year-f.birthYear>=22){
    const existing=projects.filter(p=>s.directors[p.id]===f.name);
@@ -141,7 +146,7 @@ export function familyCasting(s,catalogue,year){
    if(rand(s)>=.65)break;
    const options=[];
    for(const p of projects){const t=projectSchedule(p);if(booked.has(p.id)||schedules.some(b=>t.filmingStart<b.filmingEnd&&b.filmingStart<t.filmingEnd))continue;
-    p.roles.forEach((r,i)=>{if(!s.casts[`${p.id}:${i}`]&&genderCompatible(f.gender,r.gender)&&roleFitForAge(year-f.birthYear,r)>=35)options.push({p,r,i})});
+    p.roles.forEach((r,i)=>{if(!s.casts[`${p.id}:${i}`]&&!reserved.has(`${p.id}:${i}`)&&genderCompatible(f.gender,r.gender)&&roleFitForAge(year-f.birthYear,r)>=35)options.push({p,r,i})});
    }
    if(!options.length)break;
    const {p,r,i}=pick(s,options);s.casts[`${p.id}:${i}`]=f.name;booked.add(p.id);schedules.push(projectSchedule(p));
