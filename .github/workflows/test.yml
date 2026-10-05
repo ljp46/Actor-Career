@@ -25,3 +25,25 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Validate Python import tools
         run: python -m py_compile scripts/*.py
+
+  browser:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/career-v12'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Audit selected catalogue and franchise links
+        run: |
+          node --experimental-default-type=module scripts/audit_catalogue.js
+          node --experimental-default-type=module scripts/audit_franchises.js
+      - run: npm install --no-save --package-lock=false playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Browser regression, contracts and performance
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 &
+          node tests/browser-smoke.cjs
+          node tests/browser-v12.cjs
+          node tests/browser-curated.cjs
