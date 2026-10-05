@@ -35,6 +35,8 @@ New lives accept a birth date (1900–2100) and an independent starting date (19
 
 Settings → Cheats has separate buttons to maximise acting, drama and comedy. Select one known person or all known castmates, then separately maximise friendship, professional respect or romantic chemistry. Romantic chemistry retains adult and family restrictions; it does not automatically create a dating relationship. Cheats save immediately and do not consume weekly activities.
 
+Each eligible audition also has a **Force win (cheat)** button. It guarantees that specific role using the normal booking, filming, payment and release flow. **Attend audition** retains the normal weighted chance; using the cheat does not change future auditions. Casting windows, age/gender fit and shoot conflicts still apply.
+
 ## Living world
 
 The World tab shows productions around the current year even when the player is not involved. It supports search across productions, actors, characters and directors/creators and paginates results for mobile performance. Save-specific cast changes are displayed in place of real history while retaining the original performer underneath.
