@@ -64,10 +64,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Start from the latest main
-        run: |
-          git fetch origin main
-          git checkout -B main origin/main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -85,6 +81,4 @@ jobs:
           git add data/years
           git diff --cached --quiet && exit 0
           git commit -m "Build complete historical catalogue"
-          git fetch origin main
-          git rebase origin/main
-          git push origin HEAD:main
+          git push

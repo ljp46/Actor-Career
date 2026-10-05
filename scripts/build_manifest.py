@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Rebuild the lightweight year/opportunity manifest from imported year shards."""
 import json
+import gzip
+import math
 import pathlib
 import datetime as dt
 
@@ -11,7 +13,7 @@ YEARS = ROOT / "data" / "years"
 def role_fit_for_age(age, role):
     target = role.get("characterAge")
     if target is None:
-        target = round((role.get("ageMin", 4) + role.get("ageMax", 85)) / 2)
+        target = math.floor((role.get("ageMin", 4) + role.get("ageMax", 85)) / 2 + 0.5)
     gap = abs(age - target)
     fit = 100 - gap * 7
     if age < role.get("ageMin", 4):
@@ -56,16 +58,18 @@ def casting_start_year(project):
         casting_start = dt.date.fromisoformat(project["castingStartDate"])
     except (KeyError, ValueError):
         casting_start = filming_start - dt.timedelta(weeks=26 if big else 20)
-    return casting_start.year
+    return max(1960, casting_start.year)
 
 
 def main():
+    old_path = YEARS / "index.json"
+    previous = json.loads(old_path.read_text()) if old_path.exists() else {}
     years = []
     opportunities = {}
     totals = {"projects": 0, "roles": 0}
 
-    for path in sorted(YEARS.glob("[0-9][0-9][0-9][0-9].json")):
-        payload = json.loads(path.read_text(encoding="utf-8"))
+    for path in sorted(set(YEARS.glob("[0-9][0-9][0-9][0-9].json")) | set(YEARS.glob("[0-9][0-9][0-9][0-9].json.gz"))):
+        payload = json.loads(gzip.decompress(path.read_bytes()) if path.suffix == ".gz" else path.read_bytes())
         year = int(payload["year"])
         years.append(year)
         for project in payload.get("projects", []):
@@ -75,7 +79,11 @@ def main():
             year_bucket = opportunities.setdefault(str(casting_year), {})
             for role in project.get("roles", []):
                 totals["roles"] += 1
-                for age_at_casting in range(4, 91):
+                target = role.get("characterAge")
+                if target is None:
+                    target = math.floor((role.get("ageMin", 4) + role.get("ageMax", 85)) / 2 + 0.5)
+                # A 35% fit cannot be more than nine years from the target.
+                for age_at_casting in range(max(4, math.ceil(target - delta - 9)), min(90, math.floor(target - delta + 9)) + 1):
                     age_at_project = age_at_casting + delta
                     if role_fit_for_age(age_at_project, role) < 35:
                         continue
@@ -90,6 +98,9 @@ def main():
         "totals": totals,
         "opportunities": opportunities,
     }
+    if previous.get("compression") == "gzip":
+        manifest["compression"] = "gzip"
+        manifest["files"] = previous["files"]
     (YEARS / "index.json").write_text(
         json.dumps(manifest, separators=(",", ":")) + "\n",
         encoding="utf-8",

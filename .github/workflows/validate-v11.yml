@@ -1,0 +1,41 @@
+name: Validate Version 1.1 with Full Catalogue
+on:
+  push:
+    branches: [feature/weekly-filming-lifestyle]
+    paths:
+      - .github/workflows/validate-v11.yml
+      - scripts/build_manifest.py
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update opportunity index for weekly casting windows
+        run: python scripts/build_manifest.py
+      - name: Regression tests and full production audit
+        run: |
+          node --test --experimental-default-type=module tests/*.test.js
+          node --experimental-default-type=module scripts/audit_catalogue.js
+      - name: Browser checks with fixtures and the real catalogue
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+          python -m http.server 8765 --bind 127.0.0.1 &
+          node tests/browser-smoke.cjs
+      - name: Preserve validated weekly index on feature branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/years/index.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'Index the full catalogue for weekly casting windows'
+          git push origin HEAD:feature/weekly-filming-lifestyle

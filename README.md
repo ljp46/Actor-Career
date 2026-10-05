@@ -6,7 +6,7 @@ A mobile-first alternate-history actor life sim. Start on your fourth birthday, 
 
 The game is designed around a year-sharded real-world catalogue from **1960 through 2026**. The data/years folder can contain every imported film/TV production and every credited acting role with a named character for each year. Only the years around the current in-game date are loaded into the browser, so a large catalogue remains practical on a phone.
 
-Until those shards are built, data/sample.json is the fallback demonstration catalogue. The New Life screen reports whether the full historical database, a partial database, or only the sample is installed.
+All 67 imported years are installed as lossless `.json.gz` files, with a complete year and audition-opportunity index. The original full JSON files and all monthly checkpoints remain on `maintenance/historical-database-36386406355`. The browser decompresses only the nearby years it needs. Separate productions sharing a title remain distinct.
 
 Each imported role stores real production metadata, the historical performer and birth year where available, a separate role gender used as a hard casting constraint, flexible playing-age bounds, and source metadata so imported defaults can be corrected without changing the engine.
 
@@ -14,10 +14,11 @@ TMDB exposes performer gender rather than a definitive character-gender field. T
 
 ## Building the 1960–2026 database
 
-Do **not** paste a TMDB credential into code or commit it. Add a repository Actions secret named TMDB_TOKEN, then run **Actions → Build Historical Database → Run workflow**. The default hollywood scope imports films with US release data plus US-origin TV; worldwide is available if the game is later expanded beyond Hollywood.
+The 1960–2026 import has finished. The old full-year workflow is paused; future imports should use resumable monthly batches on the recovery branch. Do not paste a TMDB credential into code or commit it.
 
-The workflow builds all 67 year shards (1960–2026), keeps the complete credited cast rather than only headline roles, rebuilds the compact audition-opportunity index, and commits the generated shards. It also runs every three months so imported TMDB data is refreshed rather than becoming a permanent stale cache.
+`scripts/pack_catalogue.py` builds the full index and lossless compressed runtime files from validated year JSON. `scripts/audit_catalogue.js` checks the compressed files, manifest totals, and every matching role across film/TV casting profiles for all 67 years before publication.
 
+Auditions include all undecided roles meeting the 35% minimum fit and gender rule in their casting year. Search and 20-role pages let players reach the entire eligible list; there is no twelve-role cap. A successful casting removes other roles in the same production for that player.
 The browser never receives the API token.
 
 ## Gender-aware casting
