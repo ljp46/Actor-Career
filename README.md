@@ -31,7 +31,7 @@ Age remains flexible rather than exact: an adult actor can still have a strong f
 
 The World tab shows productions around the current year even when the player is not involved. It supports search across productions, actors, characters and directors/creators and paginates results for mobile performance. Save-specific cast changes are displayed in place of real history while retaining the original performer underneath.
 
-Casting years and playing-age windows are game abstractions unless an imported source explicitly provides better production timing. They should not be read as claims about the exact historical audition date.
+1960 productions cast in 1960 so they are reachable from the earliest playable start. Other productions normally cast one year before release. Casting years and playing-age windows are game abstractions unless an imported source explicitly provides better production timing. They should not be read as claims about the exact historical audition date.
 
 ## Future timeline
 

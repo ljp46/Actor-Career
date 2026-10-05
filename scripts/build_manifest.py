@@ -39,7 +39,7 @@ def main():
         years.append(year)
         for project in payload.get("projects", []):
             totals["projects"] += 1
-            casting_year = int(project.get("castingYear", project["year"] - 1))
+            casting_year = max(1960, int(project.get("castingYear", project["year"] - 1)))
             delta = int(project["year"]) - casting_year
             year_bucket = opportunities.setdefault(str(casting_year), {})
             for role in project.get("roles", []):

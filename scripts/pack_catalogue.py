@@ -1,4 +1,4 @@
-"""Publish lossless compressed copies of all saved years, leaving backups intact."""
+"""Publish lossless compressed copies and a playable-year index, leaving backups intact."""
 import gzip
 import hashlib
 import json

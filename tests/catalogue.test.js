@@ -32,3 +32,8 @@ test('shortlists do not repeat performers appearing in multiple productions',()=
  const list=auditionShortlist(career(),duplicated,projects[0],projects[0].roles[0],0);
  assert.equal(list.length,5);assert.equal(new Set(list.map(c=>c.name)).size,5);
 });
+test('1960 productions can be auditioned in the earliest playable year',()=>{
+ const s=createCareer({name:'First Year',birthday:'1956-01-01',gender:'male',background:'ordinary'},[]);
+ const first={...projects[0],year:1960,castingYear:1959,roles:[{...projects[0].roles[0],characterAge:4,ageMin:4,ageMax:10}]};
+ assert.equal(available(s,[first]).length,1);
+});

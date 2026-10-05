@@ -32,6 +32,12 @@ jobs:
         run: node --test --experimental-default-type=module tests/*.test.js
       - name: Audit auditions against all saved years
         run: node --experimental-default-type=module scripts/audit_catalogue.js
+      - name: Browser smoke test
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+          python -m http.server 8765 --bind 127.0.0.1 &
+          node tests/browser-smoke.cjs
       - name: Save verified package on this integration branch
         run: |
           git config user.name 'github-actions[bot]'
