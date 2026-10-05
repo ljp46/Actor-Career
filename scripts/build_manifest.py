@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild the lightweight year/opportunity manifest from imported year shards."""
 import json
+import math
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -10,7 +11,7 @@ YEARS = ROOT / "data" / "years"
 def role_fit_for_age(age, role):
     target = role.get("characterAge")
     if target is None:
-        target = round((role.get("ageMin", 4) + role.get("ageMax", 85)) / 2)
+        target = math.floor((role.get("ageMin", 4) + role.get("ageMax", 85)) / 2 + 0.5)
     gap = abs(age - target)
     fit = 100 - gap * 7
     if age < role.get("ageMin", 4):
@@ -43,7 +44,11 @@ def main():
             year_bucket = opportunities.setdefault(str(casting_year), {})
             for role in project.get("roles", []):
                 totals["roles"] += 1
-                for age_at_casting in range(4, 91):
+                target = role.get("characterAge")
+                if target is None:
+                    target = math.floor((role.get("ageMin", 4) + role.get("ageMax", 85)) / 2 + 0.5)
+                # A 35% fit cannot be more than nine years from the target.
+                for age_at_casting in range(max(4, math.ceil(target - delta - 9)), min(90, math.floor(target - delta + 9)) + 1):
                     age_at_project = age_at_casting + delta
                     if role_fit_for_age(age_at_project, role) < 35:
                         continue
@@ -67,3 +72,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

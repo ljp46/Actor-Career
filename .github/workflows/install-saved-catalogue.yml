@@ -1,0 +1,41 @@
+name: Validate and Package Saved Catalogue
+
+on:
+  push:
+    branches: [maintenance/install-historical-catalogue]
+    paths:
+      - .github/workflows/install-saved-catalogue.yml
+      - scripts/pack_catalogue.py
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read the verified backup without changing it
+        run: git checkout 54cf250c8d072cc7cf008956cbbf885326505224 -- data/years
+      - name: Build full index and lossless compressed years
+        run: python scripts/pack_catalogue.py
+      - name: Test audition selection, search, and compressed loading
+        run: node --test --experimental-default-type=module tests/*.test.js
+      - name: Audit auditions against all saved years
+        run: node --experimental-default-type=module scripts/audit_catalogue.js
+      - name: Save verified package on this integration branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/years
+          git commit -m 'Install validated 1960–2026 catalogue with complete audition index'
+          git push origin HEAD:maintenance/install-historical-catalogue
