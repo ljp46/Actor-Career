@@ -21,5 +21,7 @@ jobs:
           python-version: "3.12"
       - name: JavaScript tests
         run: node --test --experimental-default-type=module tests/*.test.js
+      - name: Catalogue selection tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Validate Python import tools
         run: python -m py_compile scripts/*.py

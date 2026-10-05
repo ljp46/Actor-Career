@@ -4,7 +4,7 @@ export const ageAt=(birth,year,month,day=31)=>year-Number(birth.slice(0,4))-(mon
 export const currentDate=s=>s.date||new Date(Date.UTC(s.year,s.month,0)).toISOString().slice(0,10);
 const addDays=(date,days)=>new Date(Date.parse(`${date}T12:00:00Z`)+days*86400000).toISOString().slice(0,10);
 const weekDiff=(a,b)=>Math.ceil((Date.parse(`${b}T12:00:00Z`)-Date.parse(`${a}T12:00:00Z`))/604800000);
-const validDate=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\d$/.test(value)&&!Number.isNaN(Date.parse(`${value}T12:00:00Z`));
+const validDate=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\d$/.test(value)&&!Number.isNaN(Date.parse(`${value}T12:00:00Z`))&&new Date(`${value}T12:00:00Z`).toISOString().slice(0,10)===value;
 export function rand(s){s.rng=(Math.imul(s.rng,1664525)+1013904223)>>>0;return s.rng/4294967296}
 export function pick(s,items){return items[Math.floor(rand(s)*items.length)]}
 const first=['Avery','Morgan','Jordan','Noah','Elena','Maya','Luca','Theo','Isla','Sofia','Amara','Finn','Cleo','Ezra','Rowan','Riley','Jules','Nina','Leo','Nico','Sam','Aria','Max','Dara'];
@@ -29,12 +29,25 @@ export function genderCompatible(personGender,roleGender){
 }
 export function genderLabel(g){const value=normaliseGender(g);return value==='male'?'Male':value==='female'?'Female':value==='nonbinary'?'Non-binary':'Unspecified'}
 export function person(s,name,occupation='Other',birthYear=s.year-25,relative='',gender='unspecified'){const p={id:nextId(s,'person'),name,occupation,birthYear,relative,gender:normaliseGender(gender),relationship:relative?65:0,chemistry:0,respect:0,rivalry:0,interference:0,alive:true};s.people.push(p);if(!s.usedPeople.includes(name))s.usedPeople.push(name);return p}
-export function createCareer({name,birthday,background,gender='unspecified'},catalogue){const birthYear=Number(birthday.slice(0,4));if(!name?.trim()||!validDate(birthday)||birthYear<1956||birthYear>2100)throw new Error('Choose a name and a valid birthday from 1956 to 2100.');const year=birthYear+4,month=Number(birthday.slice(5,7)),date=`${year}-${birthday.slice(5)}`;const s={version:1,rng:(birthYear*14137+name.length*113+month)>>>0,nextId:1,year,month,date,birthday,activeId:'self',people:[],children:[],possessions:[],usedPeople:[],usedTitles:[],projects:[],casts:{},directors:{},filmography:[],relationships:{},timeline:[],notifications:[],choices:[],skills:{acting:8,comedy:5,drama:5},fame:0,respect:0,money:0,health:92,representation:0,background,deathNotices:[],complete:false};person(s,name.trim(),'Aspiring actor',birthYear,'Self',gender).id='self';const names=new Set(s.usedPeople),titles=new Set();for(const project of catalogue){titles.add(project.title);if(project.director)names.add(project.director);for(const role of project.roles)if(role.actor)names.add(role.actor)}s.usedPeople=[...names];s.usedTitles=[...titles];const familyJob=background==='industry'?pick(s,['Actor','Director','Producer']):pick(s,['Teacher','Nurse','Tradesperson','Office worker']);person(s,uniqueName(s,'person'),familyJob,birthYear-26,'Parent',pick(s,['female','male']));person(s,uniqueName(s,'person'),pick(s,['Actor','Writer','Teacher','Other']),birthYear-22,'Parent',pick(s,['female','male']));person(s,uniqueName(s,'person'),pick(s,['Actor','Director','Student','Other']),birthYear+pick(s,[-4,-2,2,4]),'Sibling',pick(s,['female','male','nonbinary']));if(year>=2026)for(let y=Math.max(2027,year);y<=Math.max(2027,year+2);y++)generatedYear(s,y);s.timeline.push({year,month,date,title:'A life begins',body:`${name.trim()} turns four. A future in acting is one possibility, not a requirement.`});return s}
+export function careerStartDate({birthday,startDate}){
+ const birthYear=Number(birthday?.slice(0,4));
+ if(!validDate(birthday)||birthYear<1900||birthYear>2100)throw new Error('Choose a valid birthday from 1900 to 2100.');
+ let fourth=`${birthYear+4}-${birthday.slice(5)}`;
+ if(!validDate(fourth))fourth=`${birthYear+4}-03-01`;
+ const date=startDate||fourth;
+ if(!validDate(date)||date<'1960-01-01'||date>'2199-12-31')throw new Error('Choose a valid starting date from 1960 to 2199.');
+ if(ageAt(birthday,Number(date.slice(0,4)),Number(date.slice(5,7)),Number(date.slice(8)))<4)throw new Error('Your actor must be at least four on the starting date.');
+ return date
+}
+export function createCareer({name,birthday,startDate,background,gender='unspecified'},catalogue){const date=careerStartDate({birthday,startDate}),birthYear=Number(birthday.slice(0,4)),year=Number(date.slice(0,4)),month=Number(date.slice(5,7));if(!name?.trim())throw new Error('Choose your actor’s name.');const s={version:1,rng:(birthYear*14137+name.length*113+month)>>>0,nextId:1,year,month,date,birthday,activeId:'self',people:[],children:[],possessions:[],usedPeople:[],usedTitles:[],projects:[],casts:{},directors:{},filmography:[],relationships:{},timeline:[],notifications:[],choices:[],skills:{acting:8,comedy:5,drama:5},fame:0,respect:0,money:0,health:92,representation:0,background,deathNotices:[],complete:false};person(s,name.trim(),'Aspiring actor',birthYear,'Self',gender).id='self';const names=new Set(s.usedPeople),titles=new Set();for(const project of catalogue){titles.add(project.title);if(project.director)names.add(project.director);for(const role of project.roles)if(role.actor)names.add(role.actor)}s.usedPeople=[...names];s.usedTitles=[...titles];const familyJob=background==='industry'?pick(s,['Actor','Director','Producer']):pick(s,['Teacher','Nurse','Tradesperson','Office worker']);person(s,uniqueName(s,'person'),familyJob,birthYear-26,'Parent',pick(s,['female','male']));person(s,uniqueName(s,'person'),pick(s,['Actor','Writer','Teacher','Other']),birthYear-22,'Parent',pick(s,['female','male']));person(s,uniqueName(s,'person'),pick(s,['Actor','Director','Student','Other']),birthYear+pick(s,[-4,-2,2,4]),'Sibling',pick(s,['female','male','nonbinary']));if(year>=2026)for(let y=Math.max(2027,year);y<=Math.max(2027,year+2);y++)generatedYear(s,y);s.timeline.push({year,month,date,title:'A life begins',body:`${name.trim()} begins this story at age ${ageAt(birthday,year,month,Number(date.slice(8)))}. A future in acting is one possibility, not a requirement.`});return s}
 export const active=s=>s.people.find(p=>p.id===s.activeId);
 export function ensurePerson(s,name,occupation='Actor',birthYear=null,gender='unspecified'){let p=s.people.find(p=>p.name===name);if(p){if(normaliseGender(p.gender)==='unspecified'&&normaliseGender(gender)!=='unspecified')p.gender=normaliseGender(gender);return p}return person(s,name,occupation,birthYear||s.year-30,'',gender)}
 export const castingYear=p=>Math.max(1960,p.castingYear??p.year-1);
 // TMDB supplies release dates, not a dependable shoot calendar. These windows are game estimates.
+const scheduleCache=new WeakMap();
 export function projectSchedule(p){
+ const signature=[p.id,p.year,p.kind,p.voteCount,p.popularity,p.releaseDate,p.filmingEndDate,p.filmingStartDate,p.castingStartDate].join('|');
+ const cached=scheduleCache.get(p);if(cached?.signature===signature)return cached.schedule;
  const big=Number(p.voteCount||0)>=1000||Number(p.popularity||0)>=80;
  const tv=p.kind==='TV series';
  let releaseDate=validDate(p.releaseDate)?p.releaseDate:`${p.year}-${String(6+hashText(p.id)%6).padStart(2,'0')}-15`;
@@ -44,9 +57,9 @@ export function projectSchedule(p){
  let filmingStart=validDate(p.filmingStartDate)?p.filmingStartDate:addDays(filmingEnd,-7*durationWeeks);
  let castingStart=validDate(p.castingStartDate)?p.castingStartDate:addDays(filmingStart,-7*(big?26:20));
  if(castingStart<'1960-01-01'){const shift=Math.round((Date.parse('1960-01-01T12:00:00Z')-Date.parse(`${castingStart}T12:00:00Z`))/86400000);castingStart=addDays(castingStart,shift);filmingStart=addDays(filmingStart,shift);filmingEnd=addDays(filmingEnd,shift);releaseDate=addDays(releaseDate,shift)}
- return {castingStart,castingEnd:filmingStart,filmingStart,filmingEnd,releaseDate,durationWeeks:weekDiff(filmingStart,filmingEnd),estimated:!validDate(p.filmingStartDate)||!validDate(p.filmingEndDate)}
+ const schedule={castingStart,castingEnd:filmingStart,filmingStart,filmingEnd,releaseDate,durationWeeks:weekDiff(filmingStart,filmingEnd),estimated:!validDate(p.filmingStartDate)||!validDate(p.filmingEndDate)};scheduleCache.set(p,{signature,schedule});return schedule
 }
-export const filmingProjects=(s,catalogue)=>[...catalogue,...s.projects].filter(p=>s.filmography.some(f=>f.personId===s.activeId&&f.projectId===p.id)&&currentDate(s)>=projectSchedule(p).filmingStart&&currentDate(s)<projectSchedule(p).filmingEnd);
+export function filmingProjects(s,catalogue){const booked=new Set(s.filmography.filter(f=>f.personId===s.activeId).map(f=>f.projectId)),date=currentDate(s);return [...catalogue,...s.projects].filter(p=>{if(!booked.has(p.id))return false;const t=projectSchedule(p);return date>=t.filmingStart&&date<t.filmingEnd})}
 export function playingAge(birthYear,project){return project.year-birthYear}
 export function roleFitForAge(age,role){
  const target=role.characterAge??Math.round((role.ageMin+role.ageMax)/2),gap=Math.abs(age-target);
@@ -76,7 +89,7 @@ export function available(s,catalogue){
  const decided=new Set(s.choices),won=new Set(s.filmography.filter(f=>f.personId===actor.id).map(f=>f.projectId));
  const projects=[...catalogue,...s.projects],booked=projects.filter(p=>won.has(p.id)).map(projectSchedule),offers=[];
  for(const project of projects){
-  if(won.has(project.id))continue;
+  if(project.legacyOnly||won.has(project.id))continue;
   const t=projectSchedule(project);if(date<t.castingStart||date>=t.castingEnd||booked.some(b=>t.filmingStart<b.filmingEnd&&b.filmingStart<t.filmingEnd))continue;
   project.roles.forEach((role,index)=>{const key=`${project.id}:${index}`;if(s.casts[key]||decided.has(key))return;const fit=roleFit(s,project,role);if(fit>=35)offers.push({project,role,index,fit})})
  }
@@ -96,7 +109,44 @@ export function lifestyle(s,kind){
  const title={rest:'A quiet day',fitness:'Keeping active',nightout:'A night out'}[kind];
  s.timeline.unshift({year:s.year,month:s.month,date:currentDate(s),title,body:{rest:'You make time to recover.',fitness:'You keep your body ready for long days on set.',nightout:'You head out and enjoy life beyond work.'}[kind]})
 }
-export function familyCasting(s,catalogue,year){const family=s.people.filter(p=>p.relative&&p.relative!=='Self'&&p.alive);const projects=[...catalogue,...s.projects].filter(p=>p.year===year);for(const p of projects){const directors=family.filter(f=>f.occupation==='Director'&&year-f.birthYear>=22);if(directors.length&&rand(s)<.09){const f=pick(s,directors);s.directors[p.id]=f.name;s.timeline.unshift({year:s.year,month:s.month,title:'Family behind the camera',body:`${f.name} is directing ${p.title} in this timeline.`})}const actors=family.filter(f=>f.occupation==='Actor');for(let i=0;i<p.roles.length;i++){const r=p.roles[i],eligible=actors.filter(f=>genderCompatible(f.gender,r.gender)&&year-f.birthYear>=r.ageMin&&year-f.birthYear<=r.ageMax);if(!eligible.length||s.casts[`${p.id}:${i}`]||rand(s)>=.08)continue;const f=pick(s,eligible);s.casts[`${p.id}:${i}`]=f.name;s.filmography.push({projectId:p.id,title:p.title,year:p.year,kind:p.kind,role:r.character,personId:f.id,original:r.actor,director:s.directors[p.id]||p.director});s.timeline.unshift({year:s.year,month:s.month,title:'A family casting',body:`${f.name} has been cast as ${r.character} in ${p.title}, taking ${r.actor}'s original part.`})}}}
+export function familyCasting(s,catalogue,year){
+ const family=s.people.filter(p=>p.relative&&p.relative!=='Self'&&p.alive),projects=[...catalogue,...s.projects].filter(p=>p.year===year);
+ for(const f of family){
+  if(f.occupation==='Director'&&year-f.birthYear>=22){
+   const existing=projects.filter(p=>s.directors[p.id]===f.name);
+   if(existing.length||rand(s)>=.3)continue;
+   const options=projects.filter(p=>!s.directors[p.id]);if(!options.length)continue;
+   const p=pick(s,options);s.directors[p.id]=f.name;
+   s.timeline.unshift({year:s.year,month:s.month,title:'Family behind the camera',body:`${f.name} is directing ${p.title} in this timeline.`});
+  }
+  if(f.occupation!=='Actor')continue;
+  const credits=s.filmography.filter(c=>c.personId===f.id&&c.year===year),booked=new Set(credits.map(c=>c.projectId));
+  const schedules=projects.filter(p=>booked.has(p.id)).map(projectSchedule);
+  for(let slot=credits.length;slot<2;slot++){
+   if(rand(s)>=.65)break;
+   const options=[];
+   for(const p of projects){const t=projectSchedule(p);if(booked.has(p.id)||schedules.some(b=>t.filmingStart<b.filmingEnd&&b.filmingStart<t.filmingEnd))continue;
+    p.roles.forEach((r,i)=>{if(!s.casts[`${p.id}:${i}`]&&genderCompatible(f.gender,r.gender)&&roleFitForAge(year-f.birthYear,r)>=35)options.push({p,r,i})});
+   }
+   if(!options.length)break;
+   const {p,r,i}=pick(s,options);s.casts[`${p.id}:${i}`]=f.name;booked.add(p.id);schedules.push(projectSchedule(p));
+   s.filmography.push({projectId:p.id,title:p.title,year:p.year,kind:p.kind,role:r.character,personId:f.id,original:r.actor,director:s.directors[p.id]||p.director});
+   s.timeline.unshift({year:s.year,month:s.month,title:'A family casting',body:`${f.name} has been cast as ${r.character} in ${p.title}, taking ${r.actor}'s original part.`});
+  }
+ }
+}
+export function applyCheat(s,kind,names=[]){
+ if(['acting','drama','comedy'].includes(kind)){s.skills[kind]=100;return 1}
+ if(!['friendship','respect','chemistry'].includes(kind))throw new Error('Unknown cheat.');
+ let changed=0;const targets=new Set(names),date=currentDate(s);
+ for(const p of s.people){
+  if(!targets.has(p.name)||p.id===s.activeId||!p.alive)continue;
+  if(kind==='chemistry'&&(p.relative||ageAt(s.birthday,s.year,s.month,Number(date.slice(8)))<18||ageAt(p.birthDate||`${p.birthYear}-01-01`,s.year,s.month,Number(date.slice(8)))<18))continue;
+  const r=s.relationships[p.name]??={friendship:0,respect:0,chemistry:0,dating:false};
+  r[kind]=100;p[kind==='friendship'?'relationship':kind]=100;changed++;
+ }
+ return changed
+}
 export function advance(s,catalogue){
  if(s.complete)return;
  const previous=currentDate(s),year=s.year;
@@ -115,8 +165,9 @@ export function advance(s,catalogue){
   const age=ageAt(s.birthday,s.year,s.month,Number(s.date.slice(8)));
   if(age>=5&&age<18)s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`${a.name} turns ${age}`,body:age<13?'Childhood continues. Explore interests or audition.':'Growing independence brings more choices.'})
  }
+ const projectById=new Map([...catalogue,...s.projects].map(p=>[p.id,p]));
  for(const credit of s.filmography.filter(f=>f.personId===a.id&&f.status&&f.status!=='released')){
-  const project=[...catalogue,...s.projects].find(p=>p.id===credit.projectId);
+  const project=projectById.get(credit.projectId);
   if(!project)continue;
   const t=projectSchedule(project);
   if(credit.status==='booked'&&s.date>=t.filmingStart){credit.status='filming';s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`Filming begins: ${project.title}`,body:`You are on set as ${credit.role}. The shoot is scheduled for about ${t.durationWeeks} weeks.`})}

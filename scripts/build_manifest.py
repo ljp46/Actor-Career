@@ -92,7 +92,7 @@ def main():
                         key = str(age_at_casting)
                         gender_bucket[key] = gender_bucket.get(key, 0) + 1
 
-    manifest = {
+    manifest = {**previous,
         "years": years,
         "range": [min(years), max(years)] if years else [],
         "totals": totals,

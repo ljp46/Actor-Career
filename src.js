@@ -1,5 +1,5 @@
-import {SAVE_KEY,createCareer,active,ageAt,available,audition,auditionShortlist,roleFit,childOpportunityPreview,worldProjects,projectPhase,castingYear,train,advance,eventChoice,connect,haveChild,switchTo,castFor,directorFor,generatedYear,shop,buy,datingApp,genderLabel,normaliseGender,currentDate,projectSchedule,filmingProjects,lifestyle} from './engine.js?v=7';
-import {readCatalogueResponse,mergeCatalogue,auditionPage} from './catalogue.js?v=7';
+import {SAVE_KEY,createCareer,active,ageAt,available,audition,auditionShortlist,roleFit,childOpportunityPreview,worldProjects,projectPhase,castingYear,train,advance,eventChoice,connect,haveChild,switchTo,castFor,directorFor,generatedYear,shop,buy,datingApp,genderLabel,normaliseGender,currentDate,projectSchedule,filmingProjects,lifestyle,careerStartDate,applyCheat} from './engine.js?v=8';
+import {readCatalogueResponse,mergeCatalogue,auditionPage} from './catalogue.js?v=8';
 const $=s=>document.querySelector(s),screen=$('#screen'),nav=$('#nav');let catalogue=[],state=null,tab='home',yearIndex=new Set(),loadedYears=new Set(),opportunityIndex={},dbMeta={},worldQuery='',worldPage=0,auditionQuery='',auditionKind='',auditionPageNumber=0;
 const loadingYears=new Map();let peoplePage=0;
 async function loadYear(year){
@@ -21,12 +21,29 @@ async function loadYear(year){
  loadingYears.set(year,pending);
  try{await pending}finally{loadingYears.delete(year)}
 }
+function compactNameRegistry(career){
+ const names=new Set(career.people.map(p=>p.name)),titles=new Set(career.filmography.map(f=>f.title));
+ for(const project of [...catalogue,...career.projects]){titles.add(project.title);if(project.director)names.add(project.director);for(const r of project.roles)if(r.actor)names.add(r.actor)}
+ career.usedPeople=[...names];career.usedTitles=[...titles]
+}
 async function loadCareerYears(career){
- const keep=new Set([career.year-1,career.year,career.year+1,career.year+2,...career.filmography.map(f=>f.year)]);
- catalogue=catalogue.filter(p=>keep.has(p.year));
+ const pending=career.filmography.filter(f=>f.personId===career.activeId&&f.status&&f.status!=='released');
+ const pendingIds=new Set(pending.map(f=>f.projectId));
+ const keep=new Set([career.year-1,career.year,career.year+1,career.year+2,...pending.map(f=>f.year)]);
+ catalogue=catalogue.filter(p=>keep.has(p.year)&&(!p.legacyOnly||pendingIds.has(p.id)));
  for(const year of loadedYears)if(!keep.has(year))loadedYears.delete(year);
- // Load sequentially to limit peak memory while decompressing large year files.
- for(const year of keep)await loadYear(year)
+ for(const year of keep)await loadYear(year);
+ // Retrieve only ongoing bookings omitted by the new selection, preserving old saves.
+ const present=new Set([...catalogue,...career.projects].map(p=>p.id));
+ const missing=pending.filter(f=>!present.has(f.projectId));
+ for(const year of new Set(missing.map(f=>f.year))){
+  if(!dbMeta.archive)continue;
+  const needed=new Set(missing.filter(f=>f.year===year).map(f=>f.projectId));
+  const response=await fetch(`./${dbMeta.archive.path}/${year}.json.gz`);
+  const data=await readCatalogueResponse(response,true);
+  catalogue=mergeCatalogue(catalogue,data.projects.filter(p=>needed.has(p.id)).map(p=>({...p,legacyOnly:true})))
+ }
+ compactNameRegistry(career)
 }
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=(y,m)=>new Date(Date.UTC(y,m-1,1)).toLocaleString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});
@@ -40,28 +57,37 @@ function modal(html){const e=document.createElement('div');e.className='modal';e
 function cardTimeline(t){return `<div class="card"><span class="eyebrow">${esc(t.date?fmtDate(t.date):fmt(t.year,t.month||1))}</span><h3>${esc(t.title)}</h3><p>${esc(t.body)}</p></div>`}
 function databaseStatus(){
  const years=[...yearIndex].sort((a,b)=>a-b),totals=dbMeta.totals||{};
+ if(dbMeta.selection)return `Selected historical catalogue: 1960–2026 · up to ${dbMeta.selection.filmLimit} films and ${dbMeta.selection.tvLimit} new TV shows per year · ${Number(totals.projects||0).toLocaleString()} productions · ${Number(totals.roles||0).toLocaleString()} credited roles.`;
  if(years.length>=67&&years[0]===1960&&years.at(-1)===2026)return `Full historical database installed: 1960–2026 · ${Number(totals.projects||0).toLocaleString()} productions · ${Number(totals.roles||0).toLocaleString()} credited roles.`;
  if(years.length)return `Historical database partly installed: ${years.length} year shard${years.length===1?'':'s'} available. Missing years still fall back to the demonstration catalogue where possible.`;
  return 'Historical database has not been imported yet, so this build is currently using the demonstration catalogue.'
 }
-function opportunityMarkup(birthday,gender){
- const birthYear=Number(birthday.slice(0,4)),start=birthYear+4,byYear={},fallback=childOpportunityPreview(birthday,catalogue,6,gender);
+function opportunityMarkup(birthday,gender,startDate){
+ let date;try{date=careerStartDate({birthday,startDate})}catch(e){return esc(e.message)}
+ const birthYear=Number(birthday.slice(0,4)),start=Number(date.slice(0,4)),byYear={};
  for(let year=start;year<start+6;year++){
-  const actorAge=year-birthYear,key=String(year),g=normaliseGender(gender);
-  const indexed=opportunityIndex?.[key]?.[g]?.[String(actorAge)];
-  if(indexed!==undefined)byYear[year]=indexed;
-  else byYear[year]=fallback.byYear[year]||0
+  const actorAge=year-birthYear,indexed=opportunityIndex?.[String(year)]?.[normaliseGender(gender)]?.[String(actorAge)];
+  byYear[year]=indexed??0
  }
  const total=Object.values(byYear).reduce((a,b)=>a+b,0),years=Object.entries(byYear).map(([year,count])=>`${year}: ${count}`).join(' · ');
- return `<strong>${total.toLocaleString()} suitable child-role audition${total===1?'':'s'}</strong> are indexed across your first six playable years.<br><span class="muted">${esc(years)}${total===0?' · No matching child roles are currently indexed for this start.':''}</span>`
+ return `<strong>Approximately ${total.toLocaleString()} suitable roles</strong> begin casting across your first six playable years.<br><span class="muted">${esc(years)} · Availability also depends on the date and your bookings.</span>`
 }
 function introV2(){
  nav.hidden=true;
- const defaultBirthday='1980-06-15',defaultGender='male';
- screen.innerHTML=`<section class="hero"><div class="eyebrow">A life. A career. A changing world.</div><h1>Become part of cinema history.</h1><p>Begin at age four. Audition while real productions cast around you, or simply watch your version of Hollywood unfold.</p></section><form id="new"><div class="card"><div class="eyebrow">New life</div><label for="name">Your actor's name</label><input id="name" name="name" required maxlength="60" placeholder="Lewis Parry"><label for="birthday">Date of birth</label><input id="birthday" name="birthday" type="date" min="1956-01-01" max="2100-12-31" value="${defaultBirthday}" required><p class="muted" id="birthHint">Play begins on your fourth birthday.</p><label for="gender">Gender</label><select name="gender" id="gender" required><option value="male">Male</option><option value="female">Female</option><option value="nonbinary">Non-binary</option></select><div class="notice" id="opportunityPreview">${opportunityMarkup(defaultBirthday,defaultGender)}</div><label for="background">Family background</label><select name="background" id="background"><option value="ordinary">Ordinary household</option><option value="industry">Entertainment family</option></select><button class="primary">Begin life</button></div></form><div class="notice">${esc(databaseStatus())}</div>`;
- const update=()=>{const birthday=$('#birthday').value,gender=$('#gender').value,year=Number(birthday.slice(0,4))+4;$('#birthHint').textContent=`Play begins in ${year}, on your fourth birthday.`;$('#opportunityPreview').innerHTML=opportunityMarkup(birthday,gender)};
- $('#birthday').oninput=update;$('#gender').onchange=update;
- $('#new').onsubmit=async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(e.target)),year=Number(values.birthday.slice(0,4))+4;try{const button=e.target.querySelector('button[type=submit],button.primary');button.disabled=true;button.textContent='Loading historical productions…';for(const y of [year-1,year,year+1,year+2])await loadYear(y);action(()=>{state=createCareer(values,catalogue);tab='home'})}catch(err){toast(err.message);const button=e.target.querySelector('button.primary');button.disabled=false;button.textContent='Begin life'}}
+ const defaultBirthday='1980-06-15',defaultGender='male',defaultStart=careerStartDate({birthday:defaultBirthday});
+ screen.innerHTML=`<section class="hero"><div class="eyebrow">A life. A career. A changing world.</div><h1>Become part of cinema history.</h1><p>Begin in childhood or start your acting career later. Choose when your story opens.</p></section><form id="new"><div class="card"><div class="eyebrow">New life</div><label for="name">Your actor's name</label><input id="name" name="name" required maxlength="60" placeholder="Lewis Parry"><label for="birthday">Date of birth</label><input id="birthday" name="birthday" type="date" min="1900-01-01" max="2100-12-31" value="${defaultBirthday}" required><label for="startDate">Starting date</label><input id="startDate" name="startDate" type="date" min="1960-01-01" max="2199-12-31" value="${defaultStart}" required><div class="grid"><button type="button" class="outline" id="startChild">Start at age four</button><button type="button" class="outline" id="startAdult">Start at age eighteen</button></div><p class="muted" id="birthHint"></p><label for="gender">Gender</label><select name="gender" id="gender" required><option value="male">Male</option><option value="female">Female</option><option value="nonbinary">Non-binary</option></select><div class="notice" id="opportunityPreview"></div><label for="background">Family background</label><select name="background" id="background"><option value="ordinary">Ordinary household</option><option value="industry">Entertainment family</option></select><button type="submit" class="primary">Begin life</button></div></form><div class="notice">${esc(databaseStatus())}</div>`;
+ let customStart=false;
+ const update=()=>{
+  const birthday=$('#birthday').value,startDate=$('#startDate').value;
+  try{const date=careerStartDate({birthday,startDate});$('#startDate').setCustomValidity('');$('#birthHint').textContent=`Your story begins ${fmtDate(date)}, at age ${ageAt(birthday,Number(date.slice(0,4)),Number(date.slice(5,7)),Number(date.slice(8)))}.`}
+  catch(e){$('#startDate').setCustomValidity(e.message);$('#birthHint').textContent=e.message}
+  $('#opportunityPreview').innerHTML=opportunityMarkup(birthday,$('#gender').value,startDate)
+ };
+ const setAge=age=>{const birthday=$('#birthday').value;if(!birthday)return;const date=new Date(`${birthday}T12:00:00Z`);if(Number.isNaN(date.getTime()))return;date.setUTCFullYear(date.getUTCFullYear()+age);$('#startDate').value=date.toISOString().slice(0,10);update()};
+ $('#birthday').oninput=()=>{if(!customStart)setAge(4);else update()};
+ $('#startDate').oninput=()=>{customStart=true;update()};$('#gender').onchange=update;
+ $('#startChild').onclick=()=>{customStart=false;setAge(4)};$('#startAdult').onclick=()=>{customStart=true;setAge(18)};update();
+ $('#new').onsubmit=async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(e.target));const button=e.target.querySelector('button[type=submit]');try{const date=careerStartDate(values),year=Number(date.slice(0,4));button.disabled=true;button.textContent='Loading historical productions…';catalogue=catalogue.filter(p=>p.generated);loadedYears.clear();for(const y of [year-1,year,year+1,year+2])await loadYear(y);state=createCareer(values,catalogue);auditionQuery='';auditionPageNumber=0;peoplePage=0;tab='home';save();render()}catch(err){toast(err.message);button.disabled=false;button.textContent='Begin life'}}
 }
 function shortlistMarkup(list){return list.map(c=>`<div class="row"><span>${c.player?'<strong>You</strong>':esc(c.name)}${c.original?' <span class="muted">(historical choice)</span>':''}<br><span class="muted">${esc(genderLabel(c.gender))}</span></span><span class="pill">${c.fit}% fit</span></div>`).join('')}
 function homeV2(){
@@ -109,7 +135,7 @@ function people(){
  const p=active(state),shoots=new Set(filmingProjects(state,catalogue).map(x=>x.id)),projects=new Map([...catalogue,...state.projects].map(x=>[x.id,x]));
  const coStars=state.filmography.filter(f=>f.personId===p.id).flatMap(f=>{const project=projects.get(f.projectId);return project?project.roles.map((r,i)=>({name:castFor(state,project,i),role:r,project,onSet:shoots.has(project.id)})):[]}).filter(x=>x.name!==p.name);
  const contacts=new Map();for(const co of coStars){if(!contacts.has(co.name)||co.onSet)contacts.set(co.name,co)}
- const names=[...new Set([...coStars.filter(x=>x.onSet).map(x=>x.name),...state.people.filter(x=>x.relative&&x.id!==p.id).map(x=>x.name),...contacts.keys()])];
+ const names=[...new Set([...coStars.filter(x=>x.onSet).map(x=>x.name),...state.people.filter(x=>x.relative&&x.id!==p.id).map(x=>x.name),...contacts.keys(),...state.people.filter(x=>!x.relative&&x.id!==p.id).map(x=>x.name)])];
  const show=names.slice(0,(peoplePage+1)*20),budget=state.socialActions?.week===currentDate(state)?state.socialActions.used:0;
  screen.innerHTML=`<div class="eyebrow">People</div><h1 style="font-family:Georgia,serif">Your circle</h1><p class="muted">Two social moments per week. On-set breaks are available while you are filming. All relationships with public figures are fictional events in this save.</p><span class="pill">${Math.max(0,2-budget)} moments left this week</span>${state.year>=2012&&ageNow(state)>=18?'<button class="primary" id="datingApp">Browse dating app</button>':''}
  ${show.map(name=>{const person=state.people.find(x=>x.name===name),rel=state.relationships[name]||{},co=contacts.get(name),adult=ageNow(state)>=18&&person&&ageAt(person.birthDate||`${person.birthYear}-01-01`,state.year,state.month,Number(currentDate(state).slice(8)))>=18&&!person.relative;return `<div class="card"><div class="row"><h2>${esc(name)}</h2>${person?.relative?`<span class="tag">${esc(person.relative)}</span>`:co?`<span class="tag">${co.onSet?'On set':'Co-star'}</span>`:''}</div><p>${co?`${co.onSet?'Filming':'Worked together on'} ${esc(co.project.title)} as ${esc(co.role.character)}.`:esc(person?.occupation||'Industry contact')} ${rel.dating?'· Dating':''}</p><p class="muted">Friendship ${rel.friendship||0} · Chemistry ${rel.chemistry||0} · Rivalry ${person?.rivalry||0}</p><button class="outline" data-connect="${esc(name)}" data-kind="${co?.onSet?'set':'friend'}">${co?.onSet?'Hang out between takes':'Spend time together'}</button> ${adult?`<button class="outline" data-connect="${esc(name)}" data-kind="flirt">Flirt</button><button class="outline" data-connect="${esc(name)}" data-kind="date">Ask on a date</button>${(rel.chemistry||0)>=35?`<button class="outline" data-connect="${esc(name)}" data-kind="hookup">Suggest a hookup</button>`:''}`:''}</div>`}).join('')||'<div class="card"><p>Family and collaborators will appear here once you know them.</p></div>'}
@@ -119,12 +145,22 @@ function people(){
  screen.querySelectorAll('[data-connect]').forEach(b=>b.onclick=()=>action(()=>{if(!connect(state,b.dataset.connect,b.dataset.kind,catalogue))throw Error('This interaction is unavailable. Check ages, relationship and weekly social time.')}))
 }
 function legacy(){const p=active(state),family=state.people.filter(x=>x.relative&&x.id!==p.id),notices=state.deathNotices;screen.innerHTML=`<div class="eyebrow">The family story</div><h1 style="font-family:Georgia,serif">Legacy</h1><div class="card"><h2>${esc(p.name)}</h2><p>Born ${esc(state.birthday)} · ${esc(genderLabel(p.gender))} · ${esc(p.occupation)} · ${p.alive?'Living':'Deceased'}</p><p>${state.filmography.filter(f=>f.personId===p.id).length} credited projects in this timeline.</p></div><h2 style="font-family:Georgia,serif">Family</h2>${family.map(f=>`<div class="card"><div class="row"><h3>${esc(f.name)}</h3><span class="tag">${esc(f.relative)}</span></div><p>Born ${f.birthYear} · ${esc(genderLabel(f.gender))} · ${esc(f.occupation)} · ${f.alive?'Living':'Remembered'}</p>${state.children.includes(f.id)&&f.alive&&state.year-f.birthYear>=4?`<button class="outline" data-switch="${esc(f.id)}">Continue as ${esc(f.name)}</button>`:''}</div>`).join('')}<div class="card"><h2>Next generation</h2><p>You can name a child, then switch to their life any time after their fourth birthday. Your former character stays in the world.</p><label for="childName">Child's name</label><input id="childName" placeholder="First and last name"><label for="childGender">Gender</label><select id="childGender"><option value="male">Male</option><option value="female">Female</option><option value="nonbinary">Non-binary</option></select><button class="secondary" id="childButton">Add a child to this timeline</button></div>${notices.length?`<h2 style="font-family:Georgia,serif">Memorials</h2>${notices.map(n=>`<div class="card"><span class="eyebrow">${n.year} · ${esc(n.medium)}</span><h2>${esc(n.headline)}</h2><p>${esc(n.body)}</p>${n.tributes.map(t=>`<p class="muted">${esc(t)}</p>`).join('')}<p class="muted">Career: ${esc(n.career.join(', ')||'No screen credits')}</p></div>`).join('')}`:''}`;$('#childButton').onclick=()=>action(()=>haveChild(state,$('#childName').value,$('#childGender').value));screen.querySelectorAll('[data-switch]').forEach(b=>b.onclick=()=>action(()=>{switchTo(state,b.dataset.switch);tab='home'}))}
+function cheats(){
+ if(!state)return toast('Start a life first.');
+ const contacts=state.people.filter(p=>p.id!==state.activeId&&p.alive);
+ const castmates=contacts.filter(p=>p.occupation==='Actor'&&state.relationships[p.name]).map(p=>p.name);
+ const m=modal(`<div class="eyebrow">Your sandbox</div><h2>Cheats</h2><p>Set each skill or relationship level independently.</p><div class="grid"><button class="secondary" data-cheat="acting">Max acting</button><button class="secondary" data-cheat="drama">Max drama</button><button class="secondary" data-cheat="comedy">Max comedy</button></div><label for="cheatPerson">Relationship target</label><select id="cheatPerson"><option value="__castmates__">All known castmates (${castmates.length})</option>${contacts.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.relative?` · ${esc(p.relative)}`:''}</option>`).join('')}</select><div class="grid"><button class="secondary" data-cheat="friendship">Max friendship</button><button class="secondary" data-cheat="respect">Max professional respect</button><button class="secondary" data-cheat="chemistry">Max romantic chemistry</button></div><p class="muted">Romantic chemistry applies to adult, unrelated characters. You can still choose whether to pursue a relationship.</p><p class="notice" id="cheatResult" aria-live="polite">These changes are saved immediately.</p>`);
+ m.querySelectorAll('[data-cheat]').forEach(b=>b.onclick=()=>{
+  const target=m.querySelector('#cheatPerson').value,names=target==='__castmates__'?castmates:contacts.filter(p=>p.id===target).map(p=>p.name);
+  try{const changed=applyCheat(state,b.dataset.cheat,names);save();render();m.querySelector('#cheatResult').textContent=['acting','drama','comedy'].includes(b.dataset.cheat)?`${b.dataset.cheat} is now 100.`:`Updated ${changed} ${changed===1?'relationship':'relationships'}.`}catch(e){toast(e.message)}
+ })
+}
 function render(){if(!state){introV2();return}nav.hidden=false;nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));({home:homeV2,world,career,people,legacy}[tab]||homeV2)()}
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;render();window.scrollTo(0,0)}});
-$('#settingsButton').onclick=()=>{const m=modal(`<div class="eyebrow">Settings & credits</div><h2>Second Take</h2><p>Version 1.1 · save stored on this device. Export regularly to keep a backup. Importing replaces this device's current save.</p><div class="actions"><button class="primary" id="exportSave">Export save</button><label for="importSave">Import save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="danger" id="resetSave">Start a new life</button></div><div class="line"></div><p class="muted">Historical catalogue: ${esc(databaseStatus())} All changed casting, relationships, and tributes are fictional. Independent fan-made project; unaffiliated with any film studio or the referenced management game.</p><a href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database"><img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_long_2-9665a76b1ae401a510ec1e0ca40ddcb3b0cfe45f1d51b77a308fea0845885648.svg" alt="TMDB" style="width:140px;max-width:45%;height:auto;margin:8px 0"></a><p class="muted">This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</p>`);m.querySelector('#exportSave').onclick=()=>{if(!state)return toast('Start a life first.');const u=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=`second-take-${state.year}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)};m.querySelector('#importSave').onchange=async e=>{try{const t=await e.target.files[0].text(),v=JSON.parse(t);if(v.version!==1||!Array.isArray(v.people)||!Array.isArray(v.timeline)||!v.activeId||!Number.isInteger(v.year))throw Error('This is not a compatible save.');await loadCareerYears(v);state=v;state.date??=currentDate(state);state.directors??={};state.possessions??=[];state.people.forEach(p=>p.gender??='unspecified');save();m.remove();render()}catch(err){toast(err.message)}};m.querySelector('#resetSave').onclick=()=>{if(!confirm('Replace this device’s current life? Export it first if you want to keep it.'))return;localStorage.removeItem(SAVE_KEY);state=null;m.remove();render()}};
+$('#settingsButton').onclick=()=>{const m=modal(`<div class="eyebrow">Settings & credits</div><h2>Second Take</h2><p>Version 1.1.1 · save stored on this device. Export regularly to keep a backup. Importing replaces this device's current save.</p><div class="actions"><button class="primary" id="exportSave">Export save</button><label for="importSave">Import save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="secondary" id="openCheats">Cheats</button><button class="danger" id="resetSave">Start a new life</button></div><div class="line"></div><p class="muted">Historical catalogue: ${esc(databaseStatus())} All changed casting, relationships, and tributes are fictional. Independent fan-made project; unaffiliated with any film studio or the referenced management game.</p><a href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database"><img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_long_2-9665a76b1ae401a510ec1e0ca40ddcb3b0cfe45f1d51b77a308fea0845885648.svg" alt="TMDB" style="width:140px;max-width:45%;height:auto;margin:8px 0"></a><p class="muted">This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</p>`);m.querySelector('#openCheats').onclick=()=>{m.remove();cheats()};m.querySelector('#exportSave').onclick=()=>{if(!state)return toast('Start a life first.');const u=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=`second-take-${state.year}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)};m.querySelector('#importSave').onchange=async e=>{try{const t=await e.target.files[0].text(),v=JSON.parse(t);if(v.version!==1||!Array.isArray(v.people)||!Array.isArray(v.timeline)||!v.activeId||!Number.isInteger(v.year))throw Error('This is not a compatible save.');await loadCareerYears(v);state=v;state.date??=currentDate(state);state.directors??={};state.possessions??=[];state.people.forEach(p=>p.gender??='unspecified');save();m.remove();render()}catch(err){toast(err.message)}};m.querySelector('#resetSave').onclick=()=>{if(!confirm('Replace this device’s current life? Export it first if you want to keep it.'))return;localStorage.removeItem(SAVE_KEY);state=null;m.remove();render()}};
 async function init(){try{
- const response=await fetch('./data/sample.json?v=7');if(!response.ok)throw Error('Catalogue failed to load.');const sample=(await response.json()).projects;
- const manifest=await fetch('./data/years/index.json?v=7');if(!manifest.ok)throw Error('Historical database index could not load. Please try again online.');dbMeta=await manifest.json();yearIndex=new Set(dbMeta.years||[]);opportunityIndex=dbMeta.opportunities||{}
+ const response=await fetch('./data/sample.json?v=8');if(!response.ok)throw Error('Catalogue failed to load.');const sample=(await response.json()).projects;
+ const manifest=await fetch('./data/years/index.json?v=8');if(!manifest.ok)throw Error('Historical database index could not load. Please try again online.');dbMeta=await manifest.json();yearIndex=new Set(dbMeta.years||[]);opportunityIndex=dbMeta.opportunities||{}
  catalogue=sample.filter(p=>!yearIndex.has(p.year));
  const raw=localStorage.getItem(SAVE_KEY);
  if(raw){
@@ -134,6 +170,6 @@ async function init(){try{
    await loadCareerYears(state)
   }
  }
- render();if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=7').catch(()=>{})
+ render();if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=8').catch(()=>{})
 }catch(e){screen.innerHTML=`<div class="card"><h2>Could not load the game</h2><p>${esc(e.message)}</p><p>Open from a local web server or GitHub Pages, rather than directly as a file.</p></div>`}}
 init();
