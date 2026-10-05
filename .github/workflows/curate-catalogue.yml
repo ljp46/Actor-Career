@@ -1,0 +1,45 @@
+name: Curate and Validate Playable Catalogue
+on:
+  push:
+    branches: [maintenance/curated-catalogue]
+    paths:
+      - .github/workflows/curate-catalogue.yml
+      - scripts/curate_catalogue.py
+      - tests/browser-curated.cjs
+permissions:
+  contents: write
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select films and TV from saved catalogue
+        run: python scripts/curate_catalogue.py
+      - name: Regression tests and catalogue audit
+        run: |
+          node --test --experimental-default-type=module tests/*.test.js
+          python -m unittest discover -s tests -p 'test_*.py'
+          python -m py_compile scripts/*.py
+          node --experimental-default-type=module scripts/audit_catalogue.js
+      - name: Browser checks and extended real-data playthrough
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+          python -m http.server 8765 --bind 127.0.0.1 &
+          node tests/browser-smoke.cjs
+          node tests/browser-curated.cjs
+      - name: Preserve validated selection
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/years data/archive
+          git diff --cached --quiet && exit 0
+          git commit -m 'Select 100 films and 30 TV shows per year from the saved catalogue'
+          git push origin HEAD:maintenance/curated-catalogue
