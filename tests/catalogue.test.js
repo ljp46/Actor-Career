@@ -4,8 +4,8 @@ import {gzipSync} from 'node:zlib';
 import {available,createCareer,auditionShortlist} from '../engine.js';
 import {auditionPage,mergeCatalogue,readCatalogueResponse} from '../catalogue.js';
 
-const projects=Array.from({length:55},(_,i)=>({id:`production-${i}`,title:`Production ${String(i).padStart(2,'0')}`,year:2001,kind:i%2?'Film':'TV series',director:'A Director',roles:[{character:`Character ${i}`,actor:`Actor ${i}`,gender:'male',characterAge:21,ageMin:15,ageMax:30}]}));
-const career=()=>{const s=createCareer({name:'Test Actor',birthday:'1980-01-01',gender:'male',background:'ordinary'},[]);s.year=2000;return s};
+const projects=Array.from({length:55},(_,i)=>({id:`production-${i}`,title:`Production ${String(i).padStart(2,'0')}`,year:2001,castingStartDate:'2000-01-01',filmingStartDate:'2000-08-01',filmingEndDate:'2000-10-01',releaseDate:'2001-06-01',kind:i%2?'Film':'TV series',director:'A Director',roles:[{character:`Character ${i}`,actor:`Actor ${i}`,gender:'male',characterAge:21,ageMin:15,ageMax:30}]}));
+const career=()=>{const s=createCareer({name:'Test Actor',birthday:'1980-01-01',gender:'male',background:'ordinary'},[]);s.year=2000;s.date='2000-01-01';return s};
 test('all eligible films and TV roles are reachable beyond the old twelve-role cap',()=>{
  const offers=available(career(),projects);assert.equal(offers.length,55);
  const pages=[];for(let page=0;page<3;page++)pages.push(...auditionPage(offers,{page}).offers);
@@ -16,8 +16,8 @@ test('all eligible films and TV roles are reachable beyond the old twelve-role c
 });
 test('fit, casting year, gender, decided roles and existing credits still apply',()=>{
  const s=career();s.choices=['production-0:0'];s.casts['production-1:0']='Other Actor';s.filmography=[{projectId:'production-2',personId:'self'}];
- const extra=[{...projects[0],id:'wrong-age',roles:[{...projects[0].roles[0],characterAge:70}]},{...projects[0],id:'wrong-gender',roles:[{...projects[0].roles[0],gender:'female'}]},{...projects[0],id:'wrong-year',castingYear:1999}];
- assert.equal(available(s,[...projects,...extra]).length,52);
+ const extra=[{...projects[0],id:'wrong-age',roles:[{...projects[0].roles[0],characterAge:70}]},{...projects[0],id:'wrong-gender',roles:[{...projects[0].roles[0],gender:'female'}]},{...projects[0],id:'wrong-year',castingStartDate:'1998-01-01',filmingStartDate:'1999-01-01'}];
+ assert.equal(available(s,[...projects.map(p=>p.id==='production-2'?{...p,filmingStartDate:'1999-01-01',filmingEndDate:'1999-02-01'}:p),...extra]).length,52);
 });
 test('different productions with identical titles survive catalogue loading',()=>{
  const a={...projects[0],title:'Shared Title'},b={...projects[1],title:'Shared Title'};
@@ -34,6 +34,6 @@ test('shortlists do not repeat performers appearing in multiple productions',()=
 });
 test('1960 productions can be auditioned in the earliest playable year',()=>{
  const s=createCareer({name:'First Year',birthday:'1956-01-01',gender:'male',background:'ordinary'},[]);
- const first={...projects[0],year:1960,castingYear:1959,roles:[{...projects[0].roles[0],characterAge:4,ageMin:4,ageMax:10}]};
+ const first={...projects[0],year:1960,castingYear:1959,castingStartDate:'1959-01-01',filmingStartDate:'1959-08-01',filmingEndDate:'1959-10-01',releaseDate:'1960-06-01',roles:[{...projects[0].roles[0],characterAge:4,ageMin:4,ageMax:10}]};
  assert.equal(available(s,[first]).length,1);
 });

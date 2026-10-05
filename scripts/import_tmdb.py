@@ -168,6 +168,12 @@ def convert(kind, summary, year, cache, cast_limit):
     if kind == "tv":
         countries = item.get("origin_country") or countries
 
+    crew = [
+        {"name": x["name"], "job": x.get("job") or x.get("department") or "Crew", "personId": x.get("id")}
+        for x in credits.get("crew", [])
+        if x.get("name")
+    ]
+
     return {
         "id": f"tmdb-{kind}-{item['id']}",
         "title": item.get("title" if kind == "movie" else "name") or "Untitled",
@@ -180,6 +186,7 @@ def convert(kind, summary, year, cache, cast_limit):
         "genre": (item.get("genres") or [{"name": "Drama"}])[0]["name"],
         "genres": [g.get("name") for g in item.get("genres", []) if g.get("name")],
         "roles": roles,
+        "crew": crew,
         "tmdbId": item["id"],
         "source": "TMDB",
         "originCountries": countries,
