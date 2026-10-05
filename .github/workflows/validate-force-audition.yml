@@ -1,0 +1,22 @@
+name: Validate Force Audition UI
+on:
+  push:
+    branches: [maintenance/force-audition]
+    paths: [.github/workflows/validate-force-audition.yml, tests/browser-smoke.cjs]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Browser checks
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+          python -m http.server 8765 --bind 127.0.0.1 &
+          node tests/browser-smoke.cjs
