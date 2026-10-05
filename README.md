@@ -89,4 +89,4 @@ python -m unittest discover -s tests -p 'test_*.py'
 python -m py_compile scripts/*.py
 ~~~
 
-GitHub Actions runs both checks on pushes and pull requests.
+GitHub Actions runs unit checks on pushes and pull requests. Main, v1.2 development and pull requests also audit the full selected catalogue and franchise links, then run Chromium checks for auditions, contracts, legacy saves and an eight-year performance playthrough.

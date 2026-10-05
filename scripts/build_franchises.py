@@ -13,6 +13,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from compact_franchises import compact
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CACHE = ROOT / '.cache' / 'franchise-details'
@@ -104,7 +105,7 @@ def main():
     for c in collections.values():
         c['parts'].sort(key=lambda p: (p['releaseDate'] or f'{p["year"]}-01-01', p['id']))
     payload = {'source': 'TMDB collections with saved named casts', 'collections': collections, 'projectCollections': project_collections, 'ratings': ratings, 'selectedFilmsChecked': len(selected)}
-    packed(ROOT / 'data' / 'franchises.json.gz', payload)
+    packed(ROOT / 'data' / 'franchises.json.gz', compact(payload))
     print(json.dumps({'filmsChecked': len(selected), 'collections': len(collections), 'linkedFilms': len(project_collections), 'bytes': (ROOT / 'data' / 'franchises.json.gz').stat().st_size}), flush=True)
 
 
