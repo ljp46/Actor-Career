@@ -18,7 +18,7 @@ def read(path):
 
 def acting(character):
     return bool(character.strip()) and not re.search(
-        r'\b(self|herself|himself|themselves|host|presenter|musical guest)\b', character, re.I)
+        r'\b(self|herself|himself|themselves|host|presenter|musical guest|panelist|contestant)\b', character, re.I) and character.strip().lower() != 'guest'
 
 
 def main():
@@ -45,7 +45,7 @@ def main():
             kind = row.get('media_type')
             date = row.get('release_date' if kind == 'movie' else 'first_air_date') or ''
             reason = None
-            if kind not in ('movie', 'tv') or row.get('adult') or not acting(row.get('character') or ''):
+            if kind not in ('movie', 'tv') or row.get('adult') or not acting(row.get('character') or '') or set(row.get('genre_ids', [])) & {99, 10763, 10764, 10767}:
                 reason = 'non-acting or unnamed credit'
             elif not date or not '1960-01-01' <= date <= '2026-12-31':
                 reason = 'undated or outside historical years'
@@ -82,7 +82,11 @@ def main():
         if p is None:
             p = tmdb.convert(kind, row, int(row['first_air_date'][:4]), people, 0)
         if p is None:
-            raise RuntimeError(f'Missing dated series {sid}')
+            # Some guest-only anthologies have no series-level cast; season credits are authoritative.
+            raw = tmdb.request(f"/tv/{row['id']}")
+            p = {'id': sid, 'title': raw['name'], 'genre': (raw.get('genres') or [{'name':'Drama'}])[0]['name'],
+                 'director': next((c['name'] for c in raw.get('created_by', [])), 'Unknown'), 'creditLabel': 'Created by',
+                 'voteCount': raw.get('vote_count', 0), 'popularity': raw.get('popularity', 0), 'roles': []}
         detail = tv.request(f"/tv/{row['id']}")
         descriptors = [s for s in detail['seasons'] if s['number'] > 0 and s['airDate'] and '1960-01-01' <= s['airDate'] <= '2026-12-31']
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
