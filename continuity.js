@@ -96,7 +96,7 @@ export function continuityTick(s,catalogue,{shows={},franchises={collections:{}}
   if(!credit||!['post-production','released'].includes(credit.status)||!show&&!base?.generated)continue;
   const performance=outcomeStrength(s,credit),rawNext=nextSeason(show,c.lastSeason),next=rawNext?{...rawNext,kind:'TV series',voteCount:base?.voteCount,popularity:base?.popularity}:null,exit=characterExit(overrides,c.seriesId,c.character,c.lastSeason);
   if(!c.handled.includes(credit.projectId)){
-   c.fans=clamp(Math.round(c.fans*.35+performance*.65),0,100);c.handled.push(credit.projectId);
+   c.fans=clamp(Math.round(c.handled.length?c.fans*.35+performance*.65:performance*.85),0,100);c.handled.push(credit.projectId);
   }
   if(c.status==='left'){
    if(c.departureResolved)continue;

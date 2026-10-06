@@ -39,7 +39,7 @@ test('verified deaths override a later credit, while audience support can persis
 });
 test('strong performances can extend a cancelled series into explicitly alternate seasons',()=>{
  let renewed;
- for(let i=0;i<50&&!renewed;i++){const s=make(),credit=accept(s);wrap(s,credit,'2001-07-01',100);s.tvCareers[0].fans=100;s.rng=i*40000000;continuityTick(s,[first],{shows:{show:{...shows.show,status:'Canceled',seasons:[summary(first)]}}});if(s.projects.some(p=>p.alternateSeason))renewed=s}
+ for(let i=0;i<50&&!renewed;i++){const s=make(),credit=accept(s);wrap(s,credit,'2001-07-01',100);s.rng=i*40000000;continuityTick(s,[first],{shows:{show:{...shows.show,status:'Canceled',seasons:[summary(first)]}}});if(s.projects.some(p=>p.alternateSeason))renewed=s}
  assert.ok(renewed);assert.equal(renewed.showChanges.show.status,'renewed');assert.ok(renewed.projects.find(p=>p.alternateSeason).title.includes('alternate timeline'));assert.equal(first.title,'The Show · Season 1');
 });
 test('leaving and declining a return ends the recurring role and can cause earlier cancellation',()=>{
