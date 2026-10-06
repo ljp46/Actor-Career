@@ -5,6 +5,13 @@ import {bond,romanceAllowed,relationshipTick,answerInvitation,interactionReason,
 import {meetSomeone} from '../relationships-ui.js';
 const make=(age=24)=>{const s=createCareer({name:'Test Actor',birthday:`${2020-age}-01-01`,startDate:'2020-01-01',gender:'male'},[]);s.money=1000;return s};
 const contact=(s,age=24)=>person(s,'Test Contact','Actor',2020-age,'','female');
+test('chemistry cheat works for eligible teen crushes and preserves age boundaries and saves',()=>{
+ const s=make(13),p=contact(s,14);assert.equal(applyCheat(s,'chemistry',[p.name]),1);assert.equal(bond(s,p).chemistry,100);assert.equal(p.chemistry,100);assert.equal(bond(s,p).dating,false);assert.equal(bond(JSON.parse(JSON.stringify(s)),p).chemistry,100);
+ for(const age of [12,16,18]){const x=make(13),other=contact(x,age);assert.equal(applyCheat(x,'chemistry',[other.name]),0);assert.equal(other.chemistry,0)}
+ const adult=make(18),teen=contact(adult,17);assert.equal(applyCheat(adult,'chemistry',[teen.name]),0);
+ const child=make(12),peer=contact(child,12);assert.equal(applyCheat(child,'chemistry',[peer.name]),0);
+ p.relative='Sibling';bond(s,p).chemistry=0;assert.equal(applyCheat(s,'chemistry',[p.name]),0);assert.equal(bond(s,p).chemistry,0);
+});
 test('crushes start at 13 with close-age minors; private nights remain adult-only',()=>{
  const s=make(13),p=contact(s,14);assert.equal(romanceAllowed(s,p),true);assert.equal(romanceAllowed(s,p,{adult:true}),false);assert.equal(connect(s,p.name,'hookup'),false);
  p.birthYear=2003;assert.equal(romanceAllowed(s,p),false);p.birthYear=2002;assert.equal(romanceAllowed(s,p),false);p.birthYear=2007;s.birthday='2008-01-01';assert.equal(romanceAllowed(s,p),false);
