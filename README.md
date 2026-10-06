@@ -77,7 +77,7 @@ Casting opens before a shoot and closes when filming begins. TMDB provides relea
 
 Time advances in seven-day steps. A won part is booked, enters filming, pays at wrap, and gains release fame only when audiences can see it. Overlapping shoots block conflicting auditions. Existing monthly saves open on the last day of their saved month and retain their existing career credits and money.
 
-The People screen exposes credited co-stars once a part is booked. During filming, you can hang out between takes; adult characters can build chemistry, date, and suggest a consensual off-screen hookup. Interactions are fictional and limited by weekly social time. Rest, exercise, going out, and acting practice use separate weekly activity slots. The World screen shows the full imported named cast; crew credits are displayed when present in a shard. The importer's crew field will appear on a future rebuild, because an already running workflow keeps the script version it started with.
+The People screen exposes credited co-stars once a part is booked. During filming, you can talk between takes. Fictional social interactions use the v1.4 age, consent, energy and diminishing-return rules described above. The World screen shows the full imported named cast; crew credits are displayed when present in a shard. The importer's crew field will appear on a future rebuild, because an already running workflow keeps the script version it started with.
 
 Production schedules are cached, booked-project lookups use IDs, and family actors receive at most two non-overlapping projects per release year (family directors at most one). These limits avoid enormous family filmographies. Existing credits are retained.
 

@@ -8,13 +8,13 @@ export function ensureRelationships(s){
  s.relationshipProfiles??={};
  if(!s.relationshipOwner)s.relationshipOwner=s.activeId;
  if(s.relationshipOwner!==s.activeId){s.relationshipProfiles[s.relationshipOwner]=s.relationships||{};s.relationships=s.relationshipProfiles[s.activeId]||{};s.relationshipOwner=s.activeId}
- s.relationships??={};s.relationshipProfiles[s.activeId]=s.relationships;
+ s.relationships??={};delete s.relationshipProfiles[s.activeId];
  s.socialInvitations??=[];s.energy??=100;
  return s.relationships;
 }
 export function personality(p){if(!p.socialPersonality){let h=0;for(const c of p.name)h=(Math.imul(h,31)+c.charCodeAt(0))>>>0;p.socialPersonality={style:['Thoughtful','Adventurous','Reserved','Ambitious'][h%4],preference:['walk','outing','chat','career'][Math.floor(h/4)%4],commitment:35+h%61,privacy:h%3!==0}}return p.socialPersonality}
 export function bond(s,p){ensureRelationships(s);const r=s.relationships[p.name]??={friendship:p.relative?65:0,respect:0,chemistry:0,dating:false};r.memories??=[];r.commitment??=r.dating?35:0;r.status??=r.dating?'dating':'acquaintance';r.public??=false;r.tension??=0;personality(p);return r}
-function memory(s,p,r,title,body){r.memories.unshift({date:date(s),title,body});r.memories.length=Math.min(r.memories.length,32);s.timeline.unshift({year:s.year,month:s.month,date:date(s),title:`${title} · ${p.name}`,body});s.timeline.length=Math.min(s.timeline.length,250)}
+function memory(s,p,r,title,body,log=true){r.memories.unshift({date:date(s),title,body});r.memories.length=Math.min(r.memories.length,32);if(log)s.timeline.unshift({year:s.year,month:s.month,date:date(s),title:`${title} · ${p.name}`,body});s.timeline.length=Math.min(s.timeline.length,250)}
 export function relationshipStatus(s,p){const r=bond(s,p);return p.relative||(!p.alive?'Remembered':r.dating?(r.status==='committed'?'Partners':'Dating'):r.status==='ex'?'Former partner':p.rivalry>=35?'Rival':r.friendship>=70?'Close friend':r.friendship>=30?'Friend':'Acquaintance')}
 export function interactionReason(s,p,kind){
  if(!p?.alive||p.id===s.activeId||s.complete)return 'This person is unavailable.';
@@ -25,6 +25,7 @@ export function interactionReason(s,p,kind){
  if(['date','hookup','reconcile','commit'].includes(kind)&&Object.entries(s.relationships).some(([name,b])=>name!==p.name&&b.dating&&b.status==='committed'))return 'You are in an exclusive relationship. End it before pursuing someone else.';
  if(['date','outing','walk','hookup'].includes(kind)&&p.busyUntil>date(s))return 'They are busy with work. Try a conversation or come back after their shoot.';
  if(kind==='commit'&&!r.dating)return 'Start dating before discussing commitment.';
+ if(kind==='commit'&&r.status==='committed')return 'You have already agreed to be exclusive.';
  if(kind==='breakup'&&!r.dating)return 'You are not dating.';
  if(kind==='reconcile'&&r.status!=='ex')return 'There is no former romance to revisit.';
  if(kind==='public'&&!r.dating)return 'Start a relationship before discussing publicity.';
@@ -51,7 +52,7 @@ export function interact(s,p,kind,{onSet=false}={}){
  else if(kind==='commit'){r.status='committed';r.commitment=clamp(r.commitment+20)}
  else if(kind==='breakup'){r.dating=false;r.status='ex';r.commitment=0;r.tension=clamp(r.tension+20);r.spaceUntil=new Date(Date.parse(d+'T12:00:00Z')+21*86400000).toISOString().slice(0,10)}
  else if(kind==='public'){if(traits.privacy&&!r.public&&r.commitment<40){memory(s,p,r,'Keeping things private','Your partner prefers privacy until the relationship feels more secure.');return true}r.public=!r.public}
- else if(kind==='apologise'){r.tension=clamp(r.tension-3);r.friendship=clamp(r.friendship+Math.min(gain,2),-100,100);p.rivalry=clamp((p.rivalry||0)-Math.min(gain,3))}
+ else if(kind==='apologise'){r.tension=clamp(r.tension-Math.min(gain,3));r.friendship=clamp(r.friendship+Math.min(gain,2),-100,100);p.rivalry=clamp((p.rivalry||0)-Math.min(gain,3))}
  else if(small){r.friendship=clamp(r.friendship+gain,-100,100);if(kind==='career'||kind==='set')r.respect=clamp(r.respect+Math.min(gain,3));if(kind==='flirt')r.chemistry=clamp(r.chemistry+Math.min(gain,6));if(kind==='friend'||kind==='set')r.chemistry=clamp(r.chemistry+Math.min(gain,3))}
  if(r.dating&&['walk','outing'].includes(kind))r.commitment=clamp(r.commitment+5);
  p.relationship=r.friendship;
@@ -66,7 +67,7 @@ export function relationshipTick(s,workingNames=[]){
  s.socialInvitations=s.socialInvitations.filter(e=>e.expires>=d&&s.people.some(p=>p.id===e.from&&romanceAllowed(s,p)));
  for(const [name,r] of Object.entries(s.relationships)){
   const p=people.get(name);if(!p?.alive)continue;bond(s,p);
-  if(!r.met){r.met=d;memory(s,p,r,'A familiar face','Your existing connection continues into this chapter.')}
+  if(!r.met){r.met=d;memory(s,p,r,'A familiar face','Your existing connection continues into this chapter.',false)}
   if(r.dating&&!romanceAllowed(s,p)){r.dating=false;r.status='friends';r.commitment=0;memory(s,p,r,'A new chapter','Your lives now follow different paths. The friendship can continue.');continue}
   if(r.dating){const weeks=(Date.parse(d)-Date.parse(r.lastQuality||r.met))/604800000;if(weeks>4){r.tension=clamp(r.tension+(workingNames.length?3:1));if(weeks>8&&r.tension>=55&&roll(s)<.12){r.dating=false;r.status='ex';r.commitment=0;memory(s,p,r,'Drifting apart','Time apart and unresolved tension have ended the romance. You can still rebuild a friendship.')}else if(weeks%4<1)memory(s,p,r,'Missing time together',workingNames.length?'Your partner misses you during a long shoot. A shared outing could help.':'Your partner wishes you would make more time together.')}
    if(r.public&&s.fame>35&&roll(s)<.04){memory(s,p,r,s.year>=2010?'Relationship in the headlines':'A relationship in the press',s.year>=2010?'Fans discuss your relationship online.':'An entertainment column mentions you together.');if(personality(p).privacy)r.tension=clamp(r.tension+5)}
@@ -76,4 +77,4 @@ export function relationshipTick(s,workingNames=[]){
   if(s.socialInvitations.filter(e=>e.personId===s.activeId).length<3&&romanceAllowed(s,p)&&r.friendship>=25&&r.chemistry>=15&&(!r.spaceUntil||r.spaceUntil<=d)&&!s.socialInvitations.some(e=>e.from===p.id&&e.personId===s.activeId)&&(!r.dating||r.status!=='committed'&&r.commitment>=30)&&roll(s)<.025&&!interactionReason(s,p,r.dating?'commit':'flirt')&&!Object.entries(s.relationships).some(([name,b])=>name!==p.name&&b.dating&&b.status==='committed')){s.socialInvitations.push({id:`invite-${s.nextId++}`,from:p.id,personId:s.activeId,kind:r.dating?'commit':'date',date:d,expires:new Date(Date.parse(d+'T12:00:00Z')+28*86400000).toISOString().slice(0,10)});memory(s,p,r,r.dating?'An important conversation':'They make the first move',r.dating?'They want to discuss making your relationship exclusive.':'They ask whether you would like to start dating.')}
  }
 }
-export function recordCollaboration(s,p,project){const r=bond(s,p);r.productions??=[];if(r.productions.includes(project.id))return;r.productions.push(project.id);r.productions=r.productions.slice(-40);memory(s,p,r,r.productions.length>1?'Working together again':'A shared production',`You join the cast of ${project.title}.`);if(r.productions.length>1){r.friendship=clamp(r.friendship+3,-100,100);r.respect=clamp(r.respect+3)}}
+export function recordCollaboration(s,p,project){const r=bond(s,p);r.productions??=[];if(r.productions.includes(project.id))return;r.productions.push(project.id);r.productions=r.productions.slice(-40);memory(s,p,r,r.productions.length>1?'Working together again':'A shared production',`You join the cast of ${project.title}.`,false);if(r.productions.length>1){r.friendship=clamp(r.friendship+3,-100,100);r.respect=clamp(r.respect+3)}}
