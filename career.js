@@ -1,5 +1,5 @@
 // v1.2 career choices. Production dates and story outcomes are game simulations.
-import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=13';
+import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=14';
 
 const datePlus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const key=(s,p,i)=>`${s.activeId}:${p.id}:${i}`;

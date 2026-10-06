@@ -1,6 +1,6 @@
 // Credits establish appearances, not a death. Explicit story exits require a sourced override.
-import {active,currentDate,projectSchedule,rand,clamp,genderCompatible} from './engine.js?v=13';
-import {ensureCareer,characterKey,makeOffer,pendingOffers,leaveSeries} from './career.js?v=13';
+import {active,currentDate,projectSchedule,rand,clamp,genderCompatible} from './engine.js?v=14';
+import {ensureCareer,characterKey,makeOffer,pendingOffers,leaveSeries} from './career.js?v=14';
 
 const plus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const log=(s,title,body)=>s.timeline.unshift({year:s.year,month:s.month,date:currentDate(s),title,body});

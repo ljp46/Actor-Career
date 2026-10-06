@@ -1,4 +1,4 @@
-import {ensureRelationships,interact,relationshipTick,recordCollaboration} from './relationships.js?v=13';
+import {ensureRelationships,interact,relationshipTick,recordCollaboration,romanceAllowed} from './relationships.js?v=14';
 export const SAVE_KEY='second-take-save-v1';
 export const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const ageAt=(birth,year,month,day=31)=>year-Number(birth.slice(0,4))-(month<Number(birth.slice(5,7))||month===Number(birth.slice(5,7))&&day<Number(birth.slice(8,10))?1:0);
@@ -165,10 +165,10 @@ export function applyCheat(s,kind,names=[]){
  ensureRelationships(s);
  if(['acting','drama','comedy'].includes(kind)){s.skills[kind]=100;return 1}
  if(!['friendship','respect','chemistry'].includes(kind))throw new Error('Unknown cheat.');
- let changed=0;const targets=new Set(names),date=currentDate(s);
+ let changed=0;const targets=new Set(names);
  for(const p of s.people){
   if(!targets.has(p.name)||p.id===s.activeId||!p.alive)continue;
-  if(kind==='chemistry'&&(p.relative||ageAt(s.birthday,s.year,s.month,Number(date.slice(8)))<18||ageAt(p.birthDate||`${p.birthYear}-01-01`,s.year,s.month,Number(date.slice(8)))<18))continue;
+  if(kind==='chemistry'&&!romanceAllowed(s,p))continue;
   const r=s.relationships[p.name]??={friendship:0,respect:0,chemistry:0,dating:false};
   r[kind]=100;p[kind==='friendship'?'relationship':kind]=100;changed++;
  }
