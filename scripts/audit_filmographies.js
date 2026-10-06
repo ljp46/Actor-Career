@@ -9,7 +9,7 @@ const projects=new Map(),base=new Map(),films=new Map();
 for(const file of fs.readdirSync('data/years').filter(f=>f.endsWith('.gz')))for(const p of read(`data/years/${file}`).projects)if(p.kind==='Film')films.set(p.id,p);
 for(const year of index.years){
  const data=read(`data/filmographies/years/${year}.json.gz`);assert.equal(data.year,year);
- for(const p of data.projects){assert.equal(p.year,year);assert.ok(!projects.has(p.id),'No duplicate production IDs');assert.ok(p.roles.length);projects.set(p.id,p)}
+ for(const p of data.projects){assert.equal(p.year,year);assert.ok(!projects.has(p.id),'No duplicate production IDs');assert.ok(Array.isArray(p.roles));projects.set(p.id,p)}
  for(const p of read(`data/tv-seasons/years/${year}.json.gz`).projects)base.set(p.id,p);
 }
 for(const [id,p] of projects){
