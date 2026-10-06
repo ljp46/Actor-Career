@@ -112,6 +112,7 @@ export function continuityTick(s,catalogue,{shows={},franchises={collections:{}}
   if(s.showChanges[c.seriesId]?.status==='cancelled'){c.status='ended';c.next=null;continue}
   const threshold=c.fans>=70&&performance>=75;
   if(next){
+   if(!next.roles?.length){c.status='unverified';c.next=null;mark(s,`The next season’s cast data is unavailable. A returning role for ${c.character} cannot yet be confirmed.`,{seriesId:c.seriesId,type:'unverified'});continue}
    const matching=exit?null:matchingRole(next,c);
    if(matching){requestReturn(s,c,{...next,index:matching.index});continue}
    if(!exit&&next.roles.filter(r=>characterKey(r.character)===c.characterKey).length>1){c.status='unverified';c.next=null;mark(s,`The available credits do not uniquely identify a returning appearance for ${c.character}. No continuation is promised.`,{seriesId:c.seriesId,type:'unverified'});continue}

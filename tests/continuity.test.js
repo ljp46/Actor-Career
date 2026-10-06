@@ -24,10 +24,10 @@ test('accepting a TV part creates a recurring career and the next season is an o
  acceptCareerOffer(s,catalogue,offer.id,{collections:{},projectCollections:{}});assert.equal(s.tvCareers.length,1);assert.equal(s.tvCareers[0].lastSeason,2);assert.equal(s.filmography.length,2);
 });
 test('absent characters end their run without inventing a death; ambiguous matches are not promised',()=>{
- for(const roles of [[{...role,character:'Someone Else'}],[role,{...role,actor:'Double'}]]){
+ for(const roles of [[],[{...role,character:'Someone Else'}],[role,{...role,actor:'Double'}]]){
   const c=[first,season(2,2003,roles)],s=make(),credit=accept(s,first,c);wrap(s,credit);
   continuityTick(s,c,{shows:{show:{...shows.show,seasons:c.map(summary)}}});
-  assert.equal(s.tvCareers[0].status,roles.length>1?'unverified':'written-out');assert.equal(pendingOffers(s).length,0);assert.ok(!s.timeline[0].body.includes('death'));
+  assert.equal(s.tvCareers[0].status,roles.length!==1?'unverified':'written-out');assert.equal(pendingOffers(s).length,0);assert.ok(!s.timeline[0].body.includes('death'));
  }
 });
 test('verified deaths override a later credit, while audience support can persistently change the script',()=>{
