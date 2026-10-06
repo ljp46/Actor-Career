@@ -7,6 +7,7 @@ const {chromium}=require('playwright'),{gzipSync,gunzipSync}=require('node:zlib'
  await page.route('**/data/years/index.json*',r=>r.fulfill({json:{years:Array.from({length:67},(_,i)=>1960+i),compression:'gzip',totals:{projects:67,roles:134}}}));
  await page.route('**/data/years/*.json.gz',r=>{const year=Number(r.request().url().match(/(\d{4})\.json/)[1]);return r.fulfill({body:gzipSync(JSON.stringify({year,projects:[film(year)]}))})});
  await page.route('**/data/franchises.json.gz*',r=>r.fulfill({body:gzipSync(JSON.stringify(data))}));
+ await page.route('**/data/tv-seasons/index.json.gz*',r=>r.fulfill({body:gzipSync(JSON.stringify({shows:{},years:[]}))}));
  const save=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('second-take-save-v1')));
  const restore=async s=>{await page.evaluate(s=>localStorage.setItem('second-take-save-v1',JSON.stringify(s)),s);await page.reload();await page.locator('#auditionSearch').waitFor()};
  const jump=async date=>{const s=await save();s.date=date;s.year=Number(date.slice(0,4));s.month=Number(date.slice(5,7));await restore(s)};
@@ -24,7 +25,7 @@ const {chromium}=require('playwright'),{gzipSync,gunzipSync}=require('node:zlib'
  console.log('Browser contract fixture passed: non-binding offer, signed reservations, mandatory returns, completion and refusal.');
  const real=await browser.newPage({serviceWorkers:'block'});real.on('pageerror',e=>errors.push(e.message));
  const catalogue=JSON.parse(gunzipSync(fs.readFileSync('data/years/2003.json.gz'))),pirates=catalogue.projects.find(p=>p.title.includes('Pirates of the Caribbean')),index=pirates.roles.findIndex(r=>r.character==='Jack Sparrow');assert.ok(index>=0);
- await real.goto('http://127.0.0.1:8765');const date=await real.evaluate(async p=>(await import('./engine.js?v=10')).projectSchedule(p).castingStart,pirates);
+ await real.goto('http://127.0.0.1:8765');const date=await real.evaluate(async p=>(await import('./engine.js?v=11')).projectSchedule(p).castingStart,pirates);
  await real.locator('#name').fill('Real Franchise Test');await real.locator('#birthday').fill(`${pirates.roles[index].birthYear}-01-01`);await real.locator('#startDate').fill(date);await real.locator('#new button.primary').click();await real.locator('#auditionSearch').waitFor({timeout:120000});await real.locator('#auditionSearch').fill('Jack Sparrow');
  await real.locator(`[data-force-audition="${pirates.id}"][data-index="${index}"]`).click();await real.locator('[data-close]').click();await real.locator('summary').filter({hasText:'Optional 3-film deal'}).click();await real.locator('[data-sign-deal]').click();await real.waitForFunction(()=>JSON.parse(localStorage.getItem('second-take-save-v1')).contracts.length===1);
  const contract=await real.evaluate(()=>JSON.parse(localStorage.getItem('second-take-save-v1')).contracts[0]);assert.ok(contract.name.includes('Pirates'));assert.ok(contract.entries.every(e=>e.character==='Jack Sparrow'));console.log('Real franchise deal passed:',contract.entries.map(e=>e.project.title));
