@@ -99,10 +99,12 @@ export function continuityTick(s,catalogue,{shows={},franchises={collections:{}}
    c.fans=clamp(Math.round(c.fans*.35+performance*.65),0,100);c.handled.push(credit.projectId);
   }
   if(c.status==='left'){
+   if(c.departureResolved)continue;
    if(c.fans>=45&&next&&decide(s,`leave:${c.id}:${c.lastSeason}`,.35)&&!s.showChanges[c.seriesId]){
     s.showChanges[c.seriesId]={status:'cancelled',afterSeason:c.lastSeason,date:currentDate(s)};
     mark(s,`After your departure, ${c.title} struggles to recover its audience. The network cancels it earlier in this timeline.`,{seriesId:c.seriesId,type:'cancellation'});
    }
+   c.departureResolved=true;
    continue
   }
   if(c.status!=='active')continue;

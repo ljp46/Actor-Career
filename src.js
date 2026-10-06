@@ -47,7 +47,8 @@ async function loadCareerYears(career){
  catalogue=catalogue.filter(p=>keep.has(p.year)&&(!p.legacyOnly||pendingIds.has(p.id))&&(!p.contractOnly||contractIds.has(p.id)||pendingIds.has(p.id)));
  for(const year of loadedYears)if(!keep.has(year))loadedYears.delete(year);
  for(const year of keep)await loadYear(year);
- const showIds=new Set([...career.tvCareers.filter(c=>c.personId===career.activeId&&['active','left'].includes(c.status)).map(c=>c.seriesId),...career.filmography.filter(f=>f.personId===career.activeId&&f.kind==='TV series').map(f=>f.seriesId||f.projectId)]);
+ const showIds=new Set([...career.tvCareers.filter(c=>c.personId===career.activeId&&(c.status==='active'||c.status==='left'&&!c.departureResolved)).map(c=>c.seriesId),...career.filmography.filter(f=>f.personId===career.activeId&&f.kind==='TV series'&&!f.tvCareerId).map(f=>f.seriesId||f.projectId)]);
+ for(const id of Object.keys(seasonShows))if(!showIds.has(id))delete seasonShows[id];
  for(const id of showIds){if(!seasonShows[id]&&seasonIndex.shows[id])seasonShows[id]=await readCatalogueResponse(await fetch(`./data/tv-seasons/shows/${id}.json.gz`),true)}
  migrateSeriesCareers(career,catalogue,seasonShows);
  // Retrieve only ongoing bookings omitted by the new selection, preserving old saves.
