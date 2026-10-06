@@ -58,10 +58,10 @@ test('social life runs during filming with adult and weekly limits',()=>{
  s.people.push({id:'co',name,birthYear:1975,relative:'',alive:true});
  assert.equal(connect(s,name,'set',catalogue),true);
  assert.equal(s.relationships[name].friendship,9);
- assert.equal(connect(s,name,'set',catalogue),false,'one interaction per person each week');
+ assert.equal(connect(s,name,'set',catalogue),true,'repeat conversations are available');
  s.relationships[name].chemistry=100;s.relationships[name].friendship=100;
  advance(s,catalogue);
- assert.equal(connect(s,name,'hookup',catalogue),true);
+ s.money=100;assert.equal(connect(s,name,'hookup',catalogue),true);
  assert.ok(s.timeline[0].title.includes(name));
  const minor=createCareer({name:'Child',birthday:'1993-07-19',background:'ordinary',gender:'male'},catalogue);
  minor.year=1997;minor.month=7;minor.date='1997-07-19';minor.people.push({id:'adult',name:'Adult Actor',birthYear:1975,relative:'',alive:true});
@@ -71,6 +71,6 @@ test('social life runs during filming with adult and weekly limits',()=>{
 test('weekly lifestyle activities have time and age gates',()=>{
  const s=createCareer({name:'Riley Bell',birthday:'1980-03-10',background:'ordinary',gender:'male'},catalogue);
  assert.throws(()=>lifestyle(s,'nightout'),/adults/);
- lifestyle(s,'rest');train(s,'acting');assert.throws(()=>lifestyle(s,'fitness'),/weekly activity/);
+ lifestyle(s,'rest');train(s,'acting');lifestyle(s,'fitness');assert.equal(s.energy,70);for(let i=0;i<4;i++)train(s,'acting');assert.throws(()=>lifestyle(s,'fitness'),/energy/);
  advance(s,catalogue);lifestyle(s,'fitness');assert.equal(s.weeklyActivities.used,1);
 });

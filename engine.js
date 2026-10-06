@@ -1,3 +1,4 @@
+import {ensureRelationships,interact,relationshipTick,recordCollaboration} from './relationships.js?v=12';
 export const SAVE_KEY='second-take-save-v1';
 export const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const ageAt=(birth,year,month,day=31)=>year-Number(birth.slice(0,4))-(month<Number(birth.slice(5,7))||month===Number(birth.slice(5,7))&&day<Number(birth.slice(8,10))?1:0);
@@ -105,22 +106,23 @@ export function recordCastingChange(s,project,role,index,winner){
  s.worldChanges.unshift({projectId:project.id,title:project.title,year:project.year,index,character:role.character,original:role.actor,performer:winner,date:currentDate(s)});if(s.worldChanges.length>1000)s.worldChanges.length=1000
 }
 export function bookRole(s,catalogue,project,role,index){
+ ensureRelationships(s);
  const a=active(s),key=`${project.id}:${index}`;
  if(s.complete||!a.alive||s.filmography.some(f=>f.personId===a.id&&f.projectId===project.id&&f.status!=='withdrawn'))throw Error('This character cannot book that production.');
  if(s.casts[key]&&s.casts[key]!==a.name)throw Error('This part has already been cast.');
  const directorName=directorFor(s,project),original=ensurePerson(s,role.actor,'Actor',role.birthYear,role.gender),director=ensurePerson(s,directorName,'Director');
  s.casts[key]=a.name;if(!s.choices.includes(key))s.choices.push(key);
- s.filmography.push({projectId:project.id,title:project.title,year:project.year,kind:project.kind,role:role.character,personId:a.id,original:role.actor,director:directorName});s.filmography.at(-1).status='booked';s.filmography.at(-1).bookedOn=currentDate(s);s.filmography.at(-1).fee=project.year<1980?1200:project.year<2000?8500:28000;s.respect=clamp(s.respect+1,0,100);s.relationships[director.name]??={friendship:0,respect:0,chemistry:0};s.relationships[director.name].respect=clamp(s.relationships[director.name].respect+8,0,100);for(const [i,r] of project.roles.entries()){if(i===index)continue;const costarName=castFor(s,project,i);ensurePerson(s,costarName,'Actor',estimatedBirth(project,r),r.gender);const bond=s.relationships[costarName]??={friendship:0,respect:0,chemistry:0};bond.chemistry=clamp(bond.chemistry+5,0,100);bond.respect=clamp(bond.respect+3,0,100)}original.interference++;original.rivalry=clamp(original.rivalry+(original.interference>1?18:5),0,100);if(original.interference>=2)s.timeline.unshift({year:s.year,month:s.month,title:'A rivalry takes shape',body:`You have now won ${original.interference} parts originally associated with ${original.name}. The press begins connecting your careers.`})
+ s.filmography.push({projectId:project.id,title:project.title,year:project.year,kind:project.kind,role:role.character,personId:a.id,original:role.actor,director:directorName});s.filmography.at(-1).status='booked';s.filmography.at(-1).bookedOn=currentDate(s);s.filmography.at(-1).fee=project.year<1980?1200:project.year<2000?8500:28000;s.respect=clamp(s.respect+1,0,100);s.relationships[director.name]??={friendship:0,respect:0,chemistry:0};s.relationships[director.name].respect=clamp(s.relationships[director.name].respect+8,0,100);for(const [i,r] of project.roles.entries()){if(i===index)continue;const costarName=castFor(s,project,i);ensurePerson(s,costarName,'Actor',estimatedBirth(project,r),r.gender);const bond=s.relationships[costarName]??={friendship:0,respect:0,chemistry:0};bond.chemistry=clamp(bond.chemistry+5,0,100);bond.respect=clamp(bond.respect+3,0,100);recordCollaboration(s,s.people.find(p=>p.name===costarName),project)}original.interference++;original.rivalry=clamp(original.rivalry+(original.interference>1?18:5),0,100);if(original.interference>=2)s.timeline.unshift({year:s.year,month:s.month,title:'A rivalry takes shape',body:`You have now won ${original.interference} parts originally associated with ${original.name}. The press begins connecting your careers.`})
  const credit=s.filmography.at(-1);credit.roleIndex=index;recordCastingChange(s,project,role,index,a.name);return credit
 }
 export function audition(s,catalogue,project,role,index,{forceWin=false,deferBooking=false,includePending=false}={}){const key=`${project.id}:${index}`;if(!available(s,catalogue,{includePending}).some(o=>o.project.id===project.id&&o.index===index))throw new Error('This audition is closed or conflicts with another shoot.');if(s.choices.includes(key)||s.casts[key])throw new Error('This part has already been decided.');const a=active(s),fit=roleFit(s,project,role);if(fit<35)throw new Error('Your playing age is not close enough for this role.');s.choices.push(key);const directorName=directorFor(s,project),shortlist=auditionShortlist(s,catalogue,project,role,index);for(const c of shortlist)ensurePerson(s,c.name,'Actor',c.birthYear,c.gender);const playerEntry=shortlist.find(c=>c.player),playerWeight=Math.max(1,(playerEntry.fit*.7+s.skills.acting*.65+(/comedy/i.test(project.genre||'')?s.skills.comedy:s.skills.drama)*.25+(s.preparations?.[`${s.activeId}:${project.id}:${index}`]?.score||0)*.45+(s.careerProfiles?.[s.activeId]?.reputation??60)*.15+(s.relationships[directorName]?.respect||0)*.10+(s.relationships[directorName]?.friendship||0)*.03+s.fame*.35+s.representation*5+(s.background==='industry'?8:0)));const weighted=shortlist.map(c=>({...c,weight:c.player?playerWeight:Math.max(1,c.fit*(c.original?1.05:.88)+(hashText(c.name+project.id)%18))}));let roll=rand(s)*weighted.reduce((sum,c)=>sum+c.weight,0),winner=weighted[weighted.length-1];for(const c of weighted){roll-=c.weight;if(roll<=0){winner=c;break}}if(forceWin)winner=weighted.find(c=>c.player);if(winner.player&&deferBooking)return{win:true,winner:winner.name,original:role.actor,fit,shortlist:weighted.map(({name,fit,player,original})=>({name,fit,player,original}))};const win=winner.player===true,original=ensurePerson(s,role.actor,'Actor',role.birthYear,role.gender),director=ensurePerson(s,directorName,'Director');s.casts[key]=winner.name;if(winner.name!==role.actor)recordCastingChange(s,project,role,index,winner.name);if(win){bookRole(s,catalogue,project,role,index)}s.timeline.unshift({year:s.year,month:s.month,title:`Audition: ${project.title}`,body:win?`You won the role of ${role.character}, displacing ${original.name}.`:`${winner.name} won the role of ${role.character}${winner.original?' as in real history':', changing this timeline'}.`});return{win,winner:winner.name,original:original.name,fit,shortlist:weighted.map(({name,fit,player,original})=>({name,fit,player,original}))}}
-export function useActivity(s){const date=currentDate(s);s.weeklyActivities??={week:date,used:0};if(s.weeklyActivities.week!==date)s.weeklyActivities={week:date,used:0};if(s.weeklyActivities.used>=2)throw new Error('Your weekly activity time is full. Advance a week.');s.weeklyActivities.used++}
+export function useActivity(s){const date=currentDate(s);s.weeklyActivities??={week:date,used:0};if(s.weeklyActivities.week!==date)s.weeklyActivities={week:date,used:0};s.energy??=100;if(s.energy<15)throw new Error('You need 15 energy. Rest or advance a week.');s.energy-=15;s.weeklyActivities.used++}
 export function train(s,kind){if(!['acting','drama','comedy'].includes(kind))throw new Error('Unknown practice.');useActivity(s);const cost=kind==='acting'&&s.money>500?150:0;if(cost)s.money-=cost;s.skills[kind]=clamp(s.skills[kind]+(cost?3:1),0,100);s.health=clamp(s.health-1,0,100);s.timeline.unshift({year:s.year,month:s.month,date:currentDate(s),title:'Practice',body:`${kind} improves to ${s.skills[kind]}.`})}
 export function lifestyle(s,kind){
  if(!['rest','fitness','nightout'].includes(kind))throw new Error('Unknown activity.');
  if(kind==='nightout'&&ageAt(s.birthday,s.year,s.month,Number(currentDate(s).slice(8)))<18)throw new Error('This activity is for adults.');
  if(kind==='nightout'&&s.money<100)throw new Error('You need $100 for a night out.');
- useActivity(s);
+ if(kind==='rest'){s.energy=clamp((s.energy??100)+35,0,100)}else useActivity(s);
  if(kind==='rest')s.health=clamp(s.health+8,0,100);
  if(kind==='fitness')s.health=clamp(s.health+3,0,100);
  if(kind==='nightout'){s.money-=100;s.health=clamp(s.health-2,0,100);s.fame=clamp(s.fame+(rand(s)<.3?1:0),0,100)}
@@ -160,6 +162,7 @@ export function familyCasting(s,catalogue,year){
  }
 }
 export function applyCheat(s,kind,names=[]){
+ ensureRelationships(s);
  if(['acting','drama','comedy'].includes(kind)){s.skills[kind]=100;return 1}
  if(!['friendship','respect','chemistry'].includes(kind))throw new Error('Unknown cheat.');
  let changed=0;const targets=new Set(names),date=currentDate(s);
@@ -174,7 +177,7 @@ export function applyCheat(s,kind,names=[]){
 export function advance(s,catalogue){
  if(s.complete)return;
  const previous=currentDate(s),year=s.year;
- s.date=addDays(previous,7);s.year=Number(s.date.slice(0,4));s.month=Number(s.date.slice(5,7));s.socialActions={week:s.date,used:0,people:[]};s.weeklyActivities={week:s.date,used:0};
+ s.date=addDays(previous,7);s.year=Number(s.date.slice(0,4));s.month=Number(s.date.slice(5,7));s.socialActions={week:s.date,used:0,people:[]};s.weeklyActivities={week:s.date,used:0};s.energy=100;
  const a=active(s);
  s.health=clamp(s.health+(rand(s)<.55?1:-1),5,100);
  if(s.year>year){
@@ -200,41 +203,19 @@ export function advance(s,catalogue){
  }
  if(rand(s)<.04){const event=pick(s,[{title:'An unexpected invitation',body:'A friend invites you to a small industry gathering.',effect:'social'},{title:'A quiet week',body:'Time to rest, practice, or connect with the people around you.',effect:'rest'},{title:'Under the weather',body:'A passing illness disrupts your plans.',effect:'health'}]);s.notifications.push(event)}
  if(s.fame>30&&rand(s)<.025)s.notifications.push({title:'Recognised in public',body:'Someone spots you while you are out. Fame is starting to affect ordinary life.',effect:'fame'});
+ relationshipTick(s,filmingProjects(s,catalogue).flatMap(p=>p.roles.map((r,i)=>castFor(s,p,i))));
  if(s.timeline.length>250)s.timeline=s.timeline.slice(0,250)
 }
 export function eventChoice(s,e,choice){if(e.effect==='health')s.health=clamp(s.health-(choice==='engage'?5:2),5,100);else if(e.effect==='rest')s.health=clamp(s.health+5,5,100);else if(e.effect==='social'&&choice==='engage')s.fame=clamp(s.fame+1,0,100);else if(e.effect==='fame'&&choice==='engage')s.fame=clamp(s.fame+1,0,100);s.timeline.unshift({year:s.year,month:s.month,title:e.title,body:`${e.body} You chose to ${choice==='engage'?'engage':'keep to yourself'}.`});s.notifications.shift()}
 export function connect(s,name,kind,catalogue=[]){
- const a=active(s),p=s.people.find(x=>x.name===name);
- if(!p||p.id===a.id||!p.alive)return false;
- const date=currentDate(s),adult=ageAt(s.birthday,s.year,s.month,Number(date.slice(8)))>=18&&ageAt(p.birthDate||`${p.birthYear}-01-01`,s.year,s.month,Number(date.slice(8)))>=18;
- if(['date','flirt','hookup'].includes(kind)&&(!adult||p.relative||a.relative==='Child'&&p.id===a.id))return false;
- if(kind==='set'&&!filmingProjects(s,catalogue).some(project=>project.roles.some((r,i)=>castFor(s,project,i)===name)))return false;
- const budget=s.socialActions??={week:date,used:0,people:[]};
- if(budget.week!==date){budget.week=date;budget.used=0;budget.people=[]}
- if(budget.used>=2||budget.people.includes(name))return false;
- const r=s.relationships[name]??={friendship:0,respect:0,chemistry:0,dating:false};
- if(kind==='hookup'&&r.chemistry<35)return false;
- if(kind==='date'&&r.chemistry<12)return false;
- if(kind==='flirt'&&r.friendship<10)return false;
- if(kind==='hookup'||kind==='date'){
-  const chance=clamp((r.chemistry+(r.friendship||0)+25)/150,.2,.9);
-  if(rand(s)>chance){budget.used++;budget.people.push(name);s.socialActions=budget;s.timeline.unshift({year:s.year,month:s.month,date,title:`A moment with ${name}`,body:`${name} is not interested right now. You respect their answer.`});return true}
- }
- budget.used++;budget.people.push(name);s.socialActions=budget;
- if(kind==='date'){r.dating=true;r.friendship=clamp(r.friendship+12,-100,100);r.chemistry=clamp(r.chemistry+9,0,100)}
- else if(kind==='hookup'){r.chemistry=clamp(r.chemistry+12,0,100);r.friendship=clamp(r.friendship+3,-100,100)}
- else if(kind==='flirt'){r.chemistry=clamp(r.chemistry+12,0,100);r.friendship=clamp(r.friendship+2,-100,100)}
- else{r.friendship=clamp(r.friendship+(kind==='set'?9:6),-100,100);r.chemistry=clamp(r.chemistry+(kind==='set'?5:3),0,100)}
- p.relationship=r.friendship;
- const title={date:`A date with ${name}`,hookup:`A private night with ${name}`,flirt:`Sparks with ${name}`,set:`Between takes with ${name}`,friend:`Time with ${name}`}[kind];
- const body={date:'A possible romance begins in this fictional timeline.',hookup:'You both choose to spend the night together. What happens next is yours to decide.',flirt:'The connection feels mutual.',set:'You share a break on set and get to know each other.',friend:'You become a little closer.'}[kind];
- s.timeline.unshift({year:s.year,month:s.month,date,title,body});return true
+ return interact(s,s.people.find(p=>p.name===name),kind,{onSet:filmingProjects(s,catalogue).some(project=>project.roles.some((r,i)=>castFor(s,project,i)===name))});
+
 }
 export const shop=[{id:'wardrobe',name:'Premiere wardrobe',price:2000,minAge:16},{id:'car',name:'Car',price:18000,minAge:17},{id:'flat',name:'City apartment',price:120000,minAge:18},{id:'home',name:'Hillside house',price:850000,minAge:18}];
 export function buy(s,id){const item=shop.find(x=>x.id===id);if(!item)throw new Error('Unknown purchase.');if(ageAt(s.birthday,s.year,s.month)<item.minAge)throw new Error('You are too young for this purchase.');if(s.money<item.price)throw new Error('You do not have enough money yet.');s.possessions??=[];s.possessions.push({id:item.id,name:item.name,year:s.year,ownerId:s.activeId});s.money-=item.price;if(item.id==='wardrobe')s.fame=clamp(s.fame+1,0,100);s.timeline.unshift({year:s.year,month:s.month,title:'A new purchase',body:`${active(s).name} bought ${item.name.toLowerCase()}.`})}
-export function datingApp(s){if(s.year<2012||ageAt(s.birthday,s.year,s.month)<18)throw new Error('Dating apps are unavailable in this era or at this age.');const name=uniqueName(s,'person');const p=person(s,name,'Other',s.year-pick(s,[20,23,27,31,35]),'',pick(s,['female','male','nonbinary']));s.timeline.unshift({year:s.year,month:s.month,title:'A new connection',body:`You matched with ${name}. You can get to know them in People.`});return p}
+export function datingApp(s){if(s.year<2012||ageAt(s.birthday,s.year,s.month)<18)throw new Error('Dating apps are unavailable in this era or at this age.');const name=uniqueName(s,'person');const p=person(s,name,'Other',s.year-Math.max(18,ageAt(s.birthday,s.year,s.month,Number(currentDate(s).slice(8)))+pick(s,[-4,-2,0,2,4])),'',pick(s,['female','male','nonbinary']));s.timeline.unshift({year:s.year,month:s.month,title:'A new connection',body:`You matched with ${name}. You can get to know them in People.`});return p}
 export function haveChild(s,name,gender='unspecified'){const a=active(s);if(ageAt(s.birthday,s.year,s.month)<18)throw new Error('Your character is too young.');name=name.trim();if(!name||s.usedPeople.includes(name))throw new Error('Choose a unique name for the child.');const p=person(s,name,'Child',s.year,'Child',gender);p.birthDate=`${s.year}-${String(s.month).padStart(2,'0')}-01`;s.children.push(p.id);s.timeline.unshift({year:s.year,month:s.month,title:`Welcome, ${name}`,body:`A new generation joins the family. You can switch to them from age four.`});return p}
-export function switchTo(s,id){const p=s.people.find(x=>x.id===id);if(!p||!p.alive||ageAt(p.birthDate||`${p.birthYear}-${s.birthday.slice(5)}`,s.year,s.month)<4)throw new Error('This family member cannot be played yet.');const former=active(s);former.fame=s.fame;s.activeId=id;s.representation=s.careerProfiles?.[id]?.agent?.level||0;s.birthday=p.birthDate||`${p.birthYear}-${s.birthday.slice(5)}`;s.skills={acting:8,comedy:5,drama:5};s.fame=p.fame??clamp(Math.round(former.fame*.18),0,100);s.timeline.unshift({year:s.year,month:s.month,title:'A new point of view',body:`You now live as ${p.name}. The previous character stays in the world.`})}
+export function switchTo(s,id){const p=s.people.find(x=>x.id===id);if(!p||!p.alive||ageAt(p.birthDate||`${p.birthYear}-${s.birthday.slice(5)}`,s.year,s.month)<4)throw new Error('This family member cannot be played yet.');ensureRelationships(s);const former=active(s);former.fame=s.fame;s.activeId=id;ensureRelationships(s);s.energy=100;s.representation=s.careerProfiles?.[id]?.agent?.level||0;s.birthday=p.birthDate||`${p.birthYear}-${s.birthday.slice(5)}`;s.skills={acting:8,comedy:5,drama:5};s.fame=p.fame??clamp(Math.round(former.fame*.18),0,100);s.timeline.unshift({year:s.year,month:s.month,title:'A new point of view',body:`You now live as ${p.name}. The previous character stays in the world.`})}
 export function die(s,p,cause){const wasActive=p.id===s.activeId;if(wasActive)p.fame=s.fame;p.alive=false;const famous=(p.fame||0)>=45;const close=s.children.map(id=>s.people.find(x=>x.id===id)).filter(x=>x?.alive&&s.year-x.birthYear>=4);const headline=famous?`Hollywood mourns ${p.name}`:`Remembering ${p.name}`;const collaborator=s.filmography.find(f=>f.personId===p.id)?.director;const notice={year:s.year,name:p.name,headline,medium:s.year<1985?'Newspaper':s.year<2010?'Television and newspaper':'Social media and news',body:`${p.name} has died at ${s.year-p.birthYear} from ${cause}. ${famous?'Tributes reflect a career that touched audiences across generations.':'Family and friends remember their life.'}`,tributes:collaborator?[`${collaborator} remembers working with ${p.name} on set. (Fictional in-game tribute)`]:[],career:s.filmography.filter(f=>f.personId===p.id).map(f=>f.title)};s.deathNotices.unshift(notice);s.timeline.unshift({year:s.year,month:s.month,title:headline,body:notice.body});if(wasActive){if(close.length)switchTo(s,close[0].id);else s.complete=true}return notice}
 export function castFor(s,p,index){return s.casts[`${p.id}:${index}`]||p.roles[index].actor}
 export function directorFor(s,p){return s.directors[p.id]||p.director}
