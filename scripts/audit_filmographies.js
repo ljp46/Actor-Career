@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import assert from 'node:assert/strict';
+import {available,projectSchedule,genderCompatible,roleFitForAge} from '../engine.js';
 const read=path=>JSON.parse(zlib.gunzipSync(fs.readFileSync(path)));
 const index=JSON.parse(fs.readFileSync('data/filmographies/index.json'));
 assert.equal(index.actors.length,10);
@@ -15,6 +16,13 @@ for(const year of index.years){
 for(const [id,p] of projects){
  const previous=base.get(id);
  if(previous)assert.deepEqual(p.roles.slice(0,previous.roles.length),previous.roles,'Preserve saved cast indices');
+ if(p.roles.length){
+  const r=p.roles.find(r=>index.actors.some(a=>a.id===r.personId))||p.roles[0],date=projectSchedule(p).castingStart;
+  const birthYear=Math.min(p.year-(r.characterAge??Math.round((r.ageMin+r.ageMax)/2)),Number(date.slice(0,4))-4),gender=['male','female','nonbinary'].includes(r.gender)?r.gender:'male';
+  const s={date,year:Number(date.slice(0,4)),month:Number(date.slice(5,7)),birthday:`${birthYear}-01-01`,activeId:'self',people:[{id:'self',birthYear,gender}],choices:[],casts:{},filmography:[],projects:[],complete:false};
+  const expected=new Set(p.roles.flatMap((role,n)=>genderCompatible(gender,role.gender)&&roleFitForAge(p.year-birthYear,role)>=35?[n]:[]));
+  assert.deepEqual(new Set(available(s,[p]).map(o=>o.index)),expected,`Every eligible added role reaches auditions: ${id}`);
+ }
 }
 for(const id of Object.keys(index.shows)){
  const show=read(`data/filmographies/shows/${id}.json.gz`);
