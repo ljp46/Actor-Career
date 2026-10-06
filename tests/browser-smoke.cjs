@@ -1,5 +1,6 @@
 const {chromium}=require('playwright');const {gzipSync}=require('node:zlib');const assert=require('node:assert/strict');
 (async()=>{const browser=await chromium.launch({headless:true});const page=await browser.newPage({serviceWorkers:'block'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/data/filmographies/index.json*',r=>r.fulfill({json:{years:[],shows:{}}}));
 await page.route('**/data/tv-seasons/index.json.gz*',r=>r.fulfill({body:gzipSync(JSON.stringify({shows:{},years:[]}))}));
 await page.route('**/data/years/index.json*',r=>r.fulfill({json:{years:Array.from({length:67},(_,i)=>1960+i),compression:'gzip',totals:{projects:3685,roles:3685}}}));
 await page.route('**/data/years/*.json.gz',r=>{const year=Number(r.request().url().match(/(\d{4})\.json/)[1]);const projects=Array.from({length:55},(_,i)=>({id:`tmdb-${year}-${i}`,title:`Production ${String(i).padStart(2,'0')}`,year,castingYear:year-1,castingStartDate:`${year-1}-01-01`,filmingStartDate:`${year-1}-08-01`,filmingEndDate:`${year-1}-10-01`,releaseDate:`${year}-06-01`,kind:i%2?'Film':'TV series',director:'Test Director',roles:[{character:`Character ${i}`,actor:`Actor ${i}`,gender:'male',birthYear:year-5,characterAge:5,ageMin:4,ageMax:17}]}));return r.fulfill({contentType:'application/octet-stream',body:gzipSync(JSON.stringify({year,projects}))})});

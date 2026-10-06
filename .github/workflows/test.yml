@@ -40,6 +40,7 @@ jobs:
           node --experimental-default-type=module scripts/audit_catalogue.js
           node --experimental-default-type=module scripts/audit_franchises.js
           node --experimental-default-type=module scripts/audit_tv.js
+          node --experimental-default-type=module scripts/audit_filmographies.js
       - run: npm install --no-save --package-lock=false playwright
       - run: npx playwright install --with-deps chromium
       - name: Browser regression, contracts and performance
@@ -49,4 +50,5 @@ jobs:
           node tests/browser-v12.cjs
           node tests/browser-v13.cjs
           node tests/browser-v14.cjs
+          node tests/browser-v141.cjs
           node tests/browser-curated.cjs
