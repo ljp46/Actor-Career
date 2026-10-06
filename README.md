@@ -2,6 +2,14 @@
 
 A mobile-first alternate-history actor life sim. Choose a birthday and starting date, audition inside a living film/TV world, change casting history, build a family and relationships, spend career earnings, and continue into procedurally generated future decades.
 
+## Version 1.4 · People and relationships
+
+People now have individual profiles with friendship, professional respect, chemistry, commitment, personality, preferences and a bounded shared history. Meet new fictional people at local gatherings, parties, industry events and modern dating apps. Existing collaborators and friendships carry over from older saves.
+
+Dating starts at 13 with unrelated teenagers within two years of each other; adult dating and all private-night interactions require both characters to be 18 or older. Other characters can initiate dating or exclusivity, and the player may accept, decline or take things slowly. Attraction and commitment are independent: cheats do not guarantee consent. Rejections create a period of space while ordinary conversations stay available. Romance can remain private, become public, end, or be rebuilt later. Long shoots and lack of quality time can strain relationships. Repeated productions build professional history; fame brings era-appropriate relationship coverage.
+
+Ordinary conversations have no click limit, with diminishing gains from repetition. Training and on-set activities use 15 energy; outings and meetups use 20 plus their stated costs. Social outings advance one week through the same calendar, production, contract and TV-continuity logic as manual advancement. Rest advances one week and restores energy. Each playable family member has their own relationships, so switching to a child does not inherit a parent's romances. The interface adapts to phone and desktop screens.
+
 ## Historical world
 
 The game is designed around a year-sharded real-world catalogue from **1960 through 2026**. The playable selection contains up to **100 films and 30 new TV series per release year**, ranked by saved TMDB audience vote count, with stored popularity breaking ties. This aims for recognisable blockbusters, popular independent films and cult favourites. Every named role in each selected production remains intact. Only nearby years and pending bookings are loaded.

@@ -48,4 +48,5 @@ jobs:
           node tests/browser-smoke.cjs
           node tests/browser-v12.cjs
           node tests/browser-v13.cjs
+          node tests/browser-v14.cjs
           node tests/browser-curated.cjs

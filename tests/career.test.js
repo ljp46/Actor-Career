@@ -32,7 +32,7 @@ test('force win is a guaranteed but non-binding offer until accepted',()=>{
 });
 test('preparation consumes weekly time, coaching consumes money, and callbacks have dates',()=>{
  let found;
- for(let i=0;i<50&&!found;i++){const s=make();s.rng=i*40000000;applyCheat(s,'acting');applyCheat(s,'drama');prepareAudition(s,catalogue,first,0);prepareAudition(s,catalogue,first,0);assert.throws(()=>prepareAudition(s,catalogue,first,0),/weekly activity/);const result=startAudition(s,catalogue,first,0);if(result.stage==='callback')found={s,a:result.callback}}
+ for(let i=0;i<50&&!found;i++){const s=make();s.rng=i*40000000;applyCheat(s,'acting');applyCheat(s,'drama');prepareAudition(s,catalogue,first,0);prepareAudition(s,catalogue,first,0);prepareAudition(s,catalogue,first,0);assert.equal(s.energy,55);const result=startAudition(s,catalogue,first,0);if(result.stage==='callback')found={s,a:result.callback}}
  assert.ok(found);const {s,a}=found;assert.throws(()=>attendCallback(s,catalogue,a.id),/not ready/);advance(s,catalogue);s.money=500;prepareAudition(s,catalogue,first,0,'coach');assert.equal(s.money,0);
  const outcome=attendCallback(s,catalogue,a.id,{forceWin:true});assert.equal(outcome.stage,'offer');assert.equal(s.filmography.length,0);acceptCareerOffer(s,catalogue,outcome.offer.id,data);assert.equal(s.filmography.length,1);
 });
@@ -77,7 +77,7 @@ test('generated deals only create sequels on signing and do not prevent a full g
  assert.equal(franchisePlan(s,p,0,d).length,2);assert.equal(s.projects.length,1);const o=forceOffer(s,p,c);acceptCareerOffer(s,c,o.id,d,{multiFilm:true});assert.equal(s.projects.length,3);generatedYear(s,2029);assert.equal(s.projects.filter(p=>p.year===2029).length,13);
 });
 test('on-set work affects teamwork and performance, dilemmas give reasons to leave, outcomes happen once',()=>{
- const s=make(),{credit,contract}=acceptCareerOffer(s,catalogue,forceOffer(s).id,data,{multiFilm:true});s.date='2000-08-01';s.month=8;credit.status='filming';onSetAction(s,catalogue,first.id,'teamwork');onSetAction(s,catalogue,first.id,'rehearse');assert.equal(credit.performance.teamwork,5);assert.equal(s.relationships['Co-star'].respect,6);assert.throws(()=>onSetAction(s,catalogue,first.id,'rehearse'),/weekly/);
+ const s=make(),{credit,contract}=acceptCareerOffer(s,catalogue,forceOffer(s).id,data,{multiFilm:true});s.date='2000-08-01';s.month=8;credit.status='filming';onSetAction(s,catalogue,first.id,'teamwork');onSetAction(s,catalogue,first.id,'rehearse');assert.equal(credit.performance.teamwork,5);assert.equal(s.relationships['Co-star'].respect,6);onSetAction(s,catalogue,first.id,'rehearse');assert.equal(s.energy,55);
  s.productionEvents.push({id:'dilemma',projectId:first.id,personId:s.activeId,status:'open'});resolveProductionEvent(s,'dilemma','pushback');assert.equal(contract.unfairDemands,true);terminateContract(s,contract.id,'unfair demands');assert.equal(careerProfile(s).reputation,53);
  credit.status='released';s.date='2001-06-01';s.year=2001;careerTick(s,catalogue,data);assert.ok(credit.outcome?.fictional);const fame=s.fame,rep=careerProfile(s).reputation;careerTick(s,catalogue,data);assert.equal(s.fame,fame);assert.equal(careerProfile(s).reputation,rep);
 });

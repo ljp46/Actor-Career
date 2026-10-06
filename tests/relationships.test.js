@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createCareer,person,connect,advance,haveChild,switchTo,applyCheat,train,lifestyle} from '../engine.js';
+import {bond,romanceAllowed,relationshipTick,answerInvitation,interactionReason,recordCollaboration} from '../relationships.js';
+import {meetSomeone} from '../relationships-ui.js';
+const make=(age=24)=>{const s=createCareer({name:'Test Actor',birthday:`${2020-age}-01-01`,startDate:'2020-01-01',gender:'male'},[]);s.money=1000;return s};
+const contact=(s,age=24)=>person(s,'Test Contact','Actor',2020-age,'','female');
+test('crushes start at 13 with close-age minors; private nights remain adult-only',()=>{
+ const s=make(13),p=contact(s,14);assert.equal(romanceAllowed(s,p),true);assert.equal(romanceAllowed(s,p,{adult:true}),false);assert.equal(connect(s,p.name,'hookup'),false);
+ p.birthYear=2003;assert.equal(romanceAllowed(s,p),false);p.birthYear=2002;assert.equal(romanceAllowed(s,p),false);p.birthYear=2007;s.birthday='2008-01-01';assert.equal(romanceAllowed(s,p),false);
+ const a=make(18),minor=contact(a,17);assert.equal(romanceAllowed(a,minor),false);minor.birthYear=2002;assert.equal(romanceAllowed(a,minor,{adult:true}),true);
+ minor.relative='Sibling';assert.equal(connect(a,minor.name,'flirt'),false);assert.equal(connect(a,a.people[0].name,'date'),false);
+});
+test('repeated chats always work, taper gains and bound memories',()=>{const s=make(),p=contact(s);for(let i=0;i<100;i++)assert.equal(connect(s,p.name,'friend'),true);const r=bond(s,p);assert.equal(r.friendship,26);assert.equal(r.memories.length,32);assert.equal(s.energy,100);advance(s,[]);connect(s,p.name,'friend');assert.equal(r.friendship,32)});
+test('activities spend energy rather than stopping at two; rest recovers it',()=>{const s=make();for(let i=0;i<6;i++)train(s,'drama');assert.equal(s.energy,10);assert.throws(()=>train(s,'drama'),/energy/);lifestyle(s,'rest');train(s,'drama');assert.equal(s.energy,30);advance(s,[]);assert.equal(s.energy,100)});
+test('chemistry cheat does not create commitment or consent; rejection protects space',()=>{
+ const s=make(),p=contact(s);applyCheat(s,'chemistry',[p.name]);const r=bond(s,p);assert.equal(r.commitment,0);assert.equal(r.dating,false);r.friendship=100;s.rng=1500000000; // controlled refusal
+ for(let i=0;i<20&&!r.spaceUntil;i++){s.rng=i*200000000;connect(s,p.name,'flirt')}
+ assert.ok(r.spaceUntil);assert.equal(connect(s,p.name,'date'),false);assert.match(interactionReason(s,p,'date'),/space/);assert.equal(connect(s,p.name,'friend'),true);
+});
+test('outings charge once; friendships do not require romance; busy people explain why',()=>{const s=make(),p=contact(s);assert.equal(connect(s,p.name,'walk'),true);assert.equal(s.money,1000);assert.equal(s.energy,80);assert.equal(connect(s,p.name,'outing'),true);assert.equal(s.money,960);assert.equal(s.energy,60);p.busyUntil='2020-02-01';assert.equal(connect(s,p.name,'walk'),false);assert.equal(connect(s,p.name,'friend'),true);assert.match(interactionReason(s,p,'walk'),/busy/)});
+test('others can initiate, accepting and declining preserve agency and expiry',()=>{
+ let found;for(let seed=0;seed<1000&&!found;seed++){const s=make(),p=contact(s),r=bond(s,p);r.friendship=90;r.chemistry=90;s.rng=seed*1000000;relationshipTick(s);if(s.socialInvitations.length)found={s,p,r}}
+ assert.ok(found);let {s,p,r}=found;const e=s.socialInvitations[0],copy=JSON.parse(JSON.stringify(s));assert.equal(answerInvitation(s,e.id,'decline'),true);assert.equal(r.dating,false);assert.equal(r.friendship,90);assert.equal(answerInvitation(copy,e.id,'accept'),true);assert.equal(copy.relationships[p.name].dating,true);
+ const expired=JSON.parse(JSON.stringify(found.s));expired.socialInvitations=[e];expired.date='2020-03-01';assert.equal(answerInvitation(expired,e.id,'accept'),false);
+});
+test('commitment, breakup and reconciliation are separate from attraction',()=>{const s=make(),p=contact(s),r=bond(s,p);r.friendship=100;r.chemistry=100;s.rng=0;assert.equal(connect(s,p.name,'date'),true);r.commitment=100;s.rng=0;assert.equal(connect(s,p.name,'commit'),true);assert.equal(r.status,'committed');assert.equal(connect(s,p.name,'breakup'),true);assert.equal(r.status,'ex');assert.equal(r.dating,false);assert.equal(connect(s,p.name,'reconcile'),false);s.date='2020-02-01';s.month=2;s.rng=0;assert.equal(connect(s,p.name,'reconcile'),true);assert.equal(r.dating,true)});
+test('existing saves migrate and switching generations does not inherit a parent romance',()=>{const s=make(),p=contact(s);s.relationships[p.name]={friendship:80,respect:20,chemistry:90,dating:true};assert.equal(bond(s,p).status,'dating');const c=haveChild(s,'Test Child');s.date='2024-01-01';s.year=2024;switchTo(s,c.id);assert.equal(s.relationships[p.name],undefined);const restored=JSON.parse(JSON.stringify(s));switchTo(restored,'self');assert.equal(restored.relationships[p.name].dating,true);assert.equal(restored.relationships[p.name].friendship,80)});
+test('long shoots strain romance, quality time repairs it, repeat collaborations leave memories',()=>{const s=make(),p=contact(s),r=bond(s,p);r.dating=true;r.status='dating';r.met='2019-12-01';s.date='2020-02-01';s.month=2;relationshipTick(s,['Other Co-star']);assert.equal(r.tension,3);recordCollaboration(s,p,{id:'first',title:'First Film'});recordCollaboration(s,p,{id:'second',title:'Second Film'});recordCollaboration(s,p,{id:'second',title:'Second Film'});assert.equal(r.productions.length,2);assert.ok(r.memories.some(m=>m.title==='Working together again'));connect(s,p.name,'walk');assert.equal(r.tension,0);assert.equal(r.commitment,5)});
+test('meetups work across eras and enforce age, money and energy before creating contacts',()=>{const s=make(13);assert.throws(()=>meetSomeone(s,'party'),/adults/);const p=meetSomeone(s,'community');assert.ok(romanceAllowed(s,p));assert.equal(bond(s,p).friendship,12);assert.equal(s.energy,80);assert.match(bond(s,p).memories[0].body,/local/);const a=make(24);a.money=0;assert.throws(()=>meetSomeone(a,'industry'),/100/);assert.equal(a.people.length,4)});
