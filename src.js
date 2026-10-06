@@ -1,13 +1,13 @@
-import {SAVE_KEY,createCareer,active,ageAt,available,audition,auditionShortlist,roleFit,childOpportunityPreview,worldProjects,projectPhase,castingYear,train,advance,eventChoice,connect,haveChild,switchTo,castFor,directorFor,generatedYear,shop,buy,datingApp,genderLabel,normaliseGender,currentDate,projectSchedule,filmingProjects,lifestyle,careerStartDate,applyCheat} from './engine.js?v=12';
-import {ensureCareer,attachFranchises,careerProfile,pendingAuditions,pendingOffers,preparation,prepareAudition,startAudition,onSetAction,careerTick} from './career.js?v=12';
-import {careerHubMarkup,bindCareerHub} from './career-ui.js?v=12';
-import {readCatalogueResponse,mergeCatalogue,auditionPage} from './catalogue.js?v=12';
-import {attachSeasons,migrateSeriesCareers,continuityTick,materializeReturns} from './continuity.js?v=12';
-import {ensureRelationships} from './relationships.js?v=12';
-import {renderRelationships,meetSomeone} from './relationships-ui.js?v=12';
+import {SAVE_KEY,createCareer,active,ageAt,available,audition,auditionShortlist,roleFit,childOpportunityPreview,worldProjects,projectPhase,castingYear,train,advance,eventChoice,connect,haveChild,switchTo,castFor,directorFor,generatedYear,shop,buy,datingApp,genderLabel,normaliseGender,currentDate,projectSchedule,filmingProjects,lifestyle,careerStartDate,applyCheat} from './engine.js?v=13';
+import {ensureCareer,attachFranchises,careerProfile,pendingAuditions,pendingOffers,preparation,prepareAudition,startAudition,onSetAction,careerTick} from './career.js?v=13';
+import {careerHubMarkup,bindCareerHub} from './career-ui.js?v=13';
+import {readCatalogueResponse,mergeCatalogue,auditionPage} from './catalogue.js?v=13';
+import {attachSeasons,migrateSeriesCareers,continuityTick,materializeReturns} from './continuity.js?v=13';
+import {ensureRelationships} from './relationships.js?v=13';
+import {renderRelationships,meetSomeone} from './relationships-ui.js?v=13';
 const $=s=>document.querySelector(s),screen=$('#screen'),nav=$('#nav');let catalogue=[],state=null,tab='home',yearIndex=new Set(),loadedYears=new Set(),opportunityIndex={},dbMeta={},worldQuery='',worldPage=0,auditionQuery='',auditionKind='',auditionPageNumber=0;
 let franchiseData={collections:{},projectCollections:{},ratings:{}};
-let seasonIndex={shows:{}},seasonShows={},continuityOverrides={exits:[]};
+let seasonIndex={shows:{}},seasonShows={},continuityOverrides={exits:[]},filmographyIndex={years:[],shows:{}};
 const originalSeries=new Map();
 const loadingYears=new Map();let peoplePage=0;
 async function loadYear(year){
@@ -24,10 +24,14 @@ async function loadYear(year){
    const seasons=await readCatalogueResponse(await fetch(`./data/tv-seasons/years/${year}.json.gz`),true);
    imported=attachSeasons(imported,seasonIndex,seasons.projects);
   }
+  if(filmographyIndex.years.includes(year)){
+   const additions=await readCatalogueResponse(await fetch(`./data/filmographies/years/${year}.json.gz`),true);
+   imported=mergeCatalogue(imported,attachFranchises(additions.projects,franchiseData));
+  }
   catalogue=mergeCatalogue(catalogue,imported);
   if(state){
    const titles=new Set(state.usedTitles),names=new Set(state.usedPeople);
-   for(const project of data.projects){titles.add(project.title);for(const name of [project.director,...project.roles.map(r=>r.actor)])if(name)names.add(name)}
+   for(const project of imported){titles.add(project.title);for(const name of [project.director,...project.roles.map(r=>r.actor)])if(name)names.add(name)}
    state.usedTitles=[...titles];state.usedPeople=[...names]
   }
   loadedYears.add(year)
@@ -54,7 +58,7 @@ async function loadCareerYears(career){
  for(const [id,p] of originalSeries)if(!keep.has(p.year))originalSeries.delete(id);
  const showIds=new Set([...career.tvCareers.filter(c=>c.personId===career.activeId&&(c.status==='active'||c.status==='left'&&!c.departureResolved)).map(c=>c.seriesId),...career.filmography.filter(f=>f.personId===career.activeId&&f.kind==='TV series'&&!f.tvCareerId).map(f=>f.seriesId||f.projectId)]);
  for(const id of Object.keys(seasonShows))if(!showIds.has(id))delete seasonShows[id];
- for(const id of showIds){if(!seasonShows[id]&&seasonIndex.shows[id])seasonShows[id]=await readCatalogueResponse(await fetch(`./data/tv-seasons/shows/${id}.json.gz`),true)}
+ for(const id of showIds){if(!seasonShows[id]&&seasonIndex.shows[id])seasonShows[id]=await readCatalogueResponse(await fetch(`./data/${filmographyIndex.shows[id]?'filmographies':'tv-seasons'}/shows/${id}.json.gz`),true)}
  // Retrieve only ongoing bookings omitted by the new selection, preserving old saves.
  for(const credit of pending){const p=originalSeries.get(credit.projectId);if(p&&!catalogue.some(p=>p.id===credit.projectId))catalogue=mergeCatalogue(catalogue,[{...p,legacyOnly:true}])}
  const present=new Set([...catalogue,...career.projects].map(p=>p.id));
@@ -216,13 +220,15 @@ function cheats(){
 }
 function render(){if(!state){introV2();return}ensureRelationships(state);nav.hidden=false;nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));nav.querySelector('[data-tab="people"]').textContent='People'+(state.socialInvitations.some(e=>e.personId===state.activeId)?' •':'');({home:homeV2,world,career,people,legacy}[tab]||homeV2)()}
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;render();window.scrollTo(0,0)}});
-$('#settingsButton').onclick=()=>{const m=modal(`<div class="eyebrow">Settings & credits</div><h2>Second Take</h2><p>Version 1.4 · save stored on this device. Export regularly to keep a backup. Importing replaces this device's current save.</p><div class="actions"><button class="primary" id="exportSave">Export save</button><label for="importSave">Import save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="secondary" id="openCheats">Cheats</button><button class="danger" id="resetSave">Start a new life</button></div><div class="line"></div><p class="muted">Historical catalogue: ${esc(databaseStatus())} All changed casting, relationships, and tributes are fictional. Independent fan-made project; unaffiliated with any film studio or the referenced management game.</p><a href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database"><img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_long_2-9665a76b1ae401a510ec1e0ca40ddcb3b0cfe45f1d51b77a308fea0845885648.svg" alt="TMDB" style="width:140px;max-width:45%;height:auto;margin:8px 0"></a><p class="muted">This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</p>`);m.querySelector('#openCheats').onclick=()=>{m.remove();cheats()};m.querySelector('#exportSave').onclick=()=>{if(!state)return toast('Start a life first.');const u=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=`second-take-${state.year}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)};m.querySelector('#importSave').onchange=async e=>{try{const t=await e.target.files[0].text(),v=JSON.parse(t);if(v.version!==1||!Array.isArray(v.people)||!Array.isArray(v.timeline)||!v.activeId||!Number.isInteger(v.year))throw Error('This is not a compatible save.');await loadCareerYears(v);state=v;state.date??=currentDate(state);state.directors??={};state.possessions??=[];state.people.forEach(p=>p.gender??='unspecified');save();m.remove();render()}catch(err){toast(err.message)}};m.querySelector('#resetSave').onclick=()=>{if(!confirm('Replace this device’s current life? Export it first if you want to keep it.'))return;localStorage.removeItem(SAVE_KEY);state=null;m.remove();render()}};
+$('#settingsButton').onclick=()=>{const m=modal(`<div class="eyebrow">Settings & credits</div><h2>Second Take</h2><p>Version 1.4.1 · save stored on this device. Export regularly to keep a backup. Importing replaces this device's current save.</p><div class="actions"><button class="primary" id="exportSave">Export save</button><label for="importSave">Import save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="secondary" id="openCheats">Cheats</button><button class="danger" id="resetSave">Start a new life</button></div><div class="line"></div><p class="muted">Historical catalogue: ${esc(databaseStatus())} All changed casting, relationships, and tributes are fictional. Independent fan-made project; unaffiliated with any film studio or the referenced management game.</p><a href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database"><img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_long_2-9665a76b1ae401a510ec1e0ca40ddcb3b0cfe45f1d51b77a308fea0845885648.svg" alt="TMDB" style="width:140px;max-width:45%;height:auto;margin:8px 0"></a><p class="muted">This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</p>`);m.querySelector('#openCheats').onclick=()=>{m.remove();cheats()};m.querySelector('#exportSave').onclick=()=>{if(!state)return toast('Start a life first.');const u=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=`second-take-${state.year}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)};m.querySelector('#importSave').onchange=async e=>{try{const t=await e.target.files[0].text(),v=JSON.parse(t);if(v.version!==1||!Array.isArray(v.people)||!Array.isArray(v.timeline)||!v.activeId||!Number.isInteger(v.year))throw Error('This is not a compatible save.');await loadCareerYears(v);state=v;state.date??=currentDate(state);state.directors??={};state.possessions??=[];state.people.forEach(p=>p.gender??='unspecified');save();m.remove();render()}catch(err){toast(err.message)}};m.querySelector('#resetSave').onclick=()=>{if(!confirm('Replace this device’s current life? Export it first if you want to keep it.'))return;localStorage.removeItem(SAVE_KEY);state=null;m.remove();render()}};
 async function init(){try{
- const response=await fetch('./data/sample.json?v=12');if(!response.ok)throw Error('Catalogue failed to load.');const sample=(await response.json()).projects;
- const manifest=await fetch('./data/years/index.json?v=12');if(!manifest.ok)throw Error('Historical database index could not load. Please try again online.');dbMeta=await manifest.json();yearIndex=new Set(dbMeta.years||[]);opportunityIndex=dbMeta.opportunities||{}
- const franchises=await fetch('./data/franchises.json.gz?v=12');franchiseData=await readCatalogueResponse(franchises,true);
- seasonIndex=await readCatalogueResponse(await fetch('./data/tv-seasons/index.json.gz?v=12'),true);
- const overrides=await fetch('./data/continuity-overrides.json?v=12');if(!overrides.ok)throw Error('Character continuity could not load.');continuityOverrides=await overrides.json();
+ const response=await fetch('./data/sample.json?v=13');if(!response.ok)throw Error('Catalogue failed to load.');const sample=(await response.json()).projects;
+ const manifest=await fetch('./data/years/index.json?v=13');if(!manifest.ok)throw Error('Historical database index could not load. Please try again online.');dbMeta=await manifest.json();yearIndex=new Set(dbMeta.years||[]);opportunityIndex=dbMeta.opportunities||{}
+ const franchises=await fetch('./data/franchises.json.gz?v=13');franchiseData=await readCatalogueResponse(franchises,true);
+ seasonIndex=await readCatalogueResponse(await fetch('./data/tv-seasons/index.json.gz?v=13'),true);
+ const filmographies=await fetch('./data/filmographies/index.json?v=13');if(!filmographies.ok)throw Error('Permanent filmographies could not load. Please try again online.');filmographyIndex=await filmographies.json();
+ seasonIndex={...seasonIndex,shows:{...seasonIndex.shows,...filmographyIndex.shows}};
+ const overrides=await fetch('./data/continuity-overrides.json?v=13');if(!overrides.ok)throw Error('Character continuity could not load.');continuityOverrides=await overrides.json();
  catalogue=attachFranchises(sample.filter(p=>!yearIndex.has(p.year)),franchiseData);
  const raw=localStorage.getItem(SAVE_KEY);
  if(raw){
@@ -232,6 +238,6 @@ async function init(){try{
    await loadCareerYears(state)
   }
  }
- render();if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=12').catch(()=>{})
+ render();if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=13').catch(()=>{})
 }catch(e){screen.innerHTML=`<div class="card"><h2>Could not load the game</h2><p>${esc(e.message)}</p><p>Open from a local web server or GitHub Pages, rather than directly as a file.</p></div>`}}
 init();
