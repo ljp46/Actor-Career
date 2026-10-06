@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: prepare-v13-seasons
+  cancel-in-progress: true
 jobs:
   seasons:
     runs-on: ubuntu-latest

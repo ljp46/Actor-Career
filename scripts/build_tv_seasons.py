@@ -132,6 +132,8 @@ def main():
                                                         'roleType': r['roleType']} for i, r in enumerate(roles)]})
     for show in index['shows'].values():
         show['seasons'].sort(key=lambda s: (s['releaseDate'], s['number']))
+        packed(ROOT / 'data' / 'tv-seasons' / 'shows' / f"{show['id']}.json.gz", show)
+        show['seasons'] = [{k: v for k, v in season.items() if k != 'roles'} for season in show['seasons']]
     for year, projects in years.items():
         packed(ROOT / 'data' / 'tv-seasons' / 'years' / f'{year}.json.gz', {'year': year, 'projects': sorted(projects, key=lambda p: p['id'])})
     index['totals'] = {'shows': len(shows), 'seasons': len(results), 'roles': sum(len(p['roles']) for ps in years.values() for p in ps)}
