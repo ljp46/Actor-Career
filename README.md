@@ -51,7 +51,7 @@ Existing v1 saves migrate in place; already released credits do not receive retr
 
 ## v1.3: TV seasons and alternate character futures
 
-Curated TV shows now use dated season casts from TMDB aggregate credits, including guest and recurring characters and credited episode counts. Series-level latest-cast lists are replaced where season data is available. Seasonal shards load alongside nearby film years; detailed character histories load only for shows the player has joined.
+The initial v1.3 data pass contains 8,576 dated seasons and 592,937 character credits across the 2,010 curated TV shows. The startup index is 142,531 bytes; detailed character histories load only for shows the player has joined. Curated shows use season-specific TMDB aggregate casts, including guest and recurring characters and credited episode counts. Series-level latest-cast lists are replaced where season data is available, and seasonal shards load alongside nearby film years.
 
 Accepting a TV role starts a series career. A uniquely matched returning character receives next-season offers without auditioning again. Accept a return, leave the series voluntarily, or allow its offer to expire. Already filming seasons continue; leaving affects future work. Guest appearances remain labelled as guest credits. A character absent from the next verified cast has no promised return, and ambiguous character matches are never treated as certain continuity.
 
@@ -101,4 +101,4 @@ python -m unittest discover -s tests -p 'test_*.py'
 python -m py_compile scripts/*.py
 ~~~
 
-GitHub Actions runs unit checks on pushes and pull requests. Main, v1.2 development and pull requests also audit the full selected catalogue and franchise links, then run Chromium checks for auditions, contracts, legacy saves and an eight-year performance playthrough.
+GitHub Actions runs unit checks on pushes and pull requests. Main, feature branches and pull requests also audit the full selected catalogue and franchise links, then run Chromium checks for auditions, contracts, recurring TV seasons, legacy saves and an eight-year performance playthrough.
