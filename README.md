@@ -47,7 +47,19 @@ TMDB collections link real film franchises. Optional multi-film deals reserve up
 
 The compact startup index contains recurring character links only. Excluded franchise productions are fetched individually when needed for a signed return, rather than loading the complete archive. Ordinary auditions still use the curated 100-film/30-TV yearly selection. Long-gap revivals, same-title remakes and ambiguous character matches are not promised as contract returns.
 
-Full TV-season continuity, character write-offs and fan-driven changes remain planned for v1.3. Relationship redesign is deferred. Existing v1 saves migrate in place; already released credits do not receive retroactive performance rewards.
+Existing v1 saves migrate in place; already released credits do not receive retroactive performance rewards. Relationship redesign remains deferred.
+
+## v1.3: TV seasons and alternate character futures
+
+Curated TV shows now use dated season casts from TMDB aggregate credits, including guest and recurring characters and credited episode counts. Series-level latest-cast lists are replaced where season data is available. Seasonal shards load alongside nearby film years; detailed character histories load only for shows the player has joined.
+
+Accepting a TV role starts a series career. A uniquely matched returning character receives next-season offers without auditioning again. Accept a return, leave the series voluntarily, or allow its offer to expire. Already filming seasons continue; leaving affects future work. Guest appearances remain labelled as guest credits. A character absent from the next verified cast has no promised return, and ambiguous character matches are never treated as certain continuity.
+
+Strong performances and audience attachment can change a character departure, win an alternate renewal, or inspire a new film-sequel appearance. Leaving a popular role can contribute to earlier cancellation. These decisions are saved once and their chances are hidden. Alternate productions and story changes are clearly marked as fictional; shared real-world casts are preserved.
+
+TMDB credits do not prove a character died or a series was cancelled for a particular reason. Explicit deaths use sourced entries in data/continuity-overrides.json, including JJ's season-four departure in Outer Banks. Other missing appearances are described as departures without invented causes. Flashbacks or visions do not establish an ongoing living role. Data gaps and unknown future dates are not fabricated as real history; continuing beyond the dated catalogue is explicitly alternate timeline gameplay.
+
+scripts/build_tv_seasons.py builds checkpointed season data using the configured TMDB credential. scripts/audit_tv.js checks every seasonal shard and role index. Existing series-level bookings keep their original payment and release flow during migration. Filming windows are estimates, not episode-level historical shoot records.
 
 ## Living world
 

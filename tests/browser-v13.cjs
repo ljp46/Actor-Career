@@ -1,0 +1,28 @@
+const {chromium}=require('playwright'),{gzipSync,gunzipSync}=require('node:zlib'),fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({headless:true}),page=await browser.newPage({serviceWorkers:'block'}),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ const film=(number,year)=>({id:`show-season-${number}`,seriesId:'show',seriesTitle:'Fixture Show',title:`Fixture Show · Season ${number}`,seasonNumber:number,year,kind:'TV series',genre:'Drama',director:'Fixture Director',castingStartDate:`${year-1}-01-01`,filmingStartDate:`${year-1}-08-01`,filmingEndDate:`${year-1}-10-01`,releaseDate:`${year}-06-01`,roles:[{actor:'Original Actor',character:'Alex Vale',gender:'male',personId:10,birthYear:1980,characterAge:year-1980,ageMin:18,ageMax:40,episodeCount:10,roleType:'recurring'}]});
+ const parts=[film(1,2001),film(2,2003),film(3,2005)],show={id:'show',title:'Fixture Show',status:'Ended',seasons:parts.map(p=>({...p,number:p.seasonNumber,roles:p.roles.map((r,index)=>({index,character:r.character,actorId:r.personId}))}))};
+ const fulfill=(r,d)=>r.fulfill({body:gzipSync(JSON.stringify(d))});
+ await page.route('**/data/years/index.json*',r=>r.fulfill({json:{years:Array.from({length:67},(_,i)=>1960+i),compression:'gzip',totals:{projects:67,roles:67}}}));
+ await page.route('**/data/years/*.json.gz',r=>fulfill(r,{year:Number(r.request().url().match(/(\d{4})\.json/)[1]),projects:[]}));
+ await page.route('**/data/tv-seasons/index.json.gz*',r=>fulfill(r,{shows:{show},years:Array.from({length:67},(_,i)=>1960+i)}));
+ await page.route('**/data/tv-seasons/years/*.json.gz',r=>{const year=Number(r.request().url().match(/(\d{4})\.json/)[1]);return fulfill(r,{year,projects:parts.filter(p=>p.year===year)})});
+ await page.route('**/data/tv-seasons/shows/*.json.gz',r=>fulfill(r,show));
+ const save=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('second-take-save-v1')));
+ const restore=async s=>{await page.evaluate(s=>localStorage.setItem('second-take-save-v1',JSON.stringify(s)),s);await page.reload();await page.locator('#auditionSearch').waitFor()};
+ const jump=async date=>{const s=await save();s.date=date;s.year=Number(date.slice(0,4));s.month=Number(date.slice(5,7));await restore(s)};
+ const next=async()=>{const date=(await save()).date;await page.locator('[data-advance="1"]').click();await page.waitForFunction(d=>JSON.parse(localStorage.getItem('second-take-save-v1')).date!==d,date)};
+ await page.goto('http://127.0.0.1:8765');await page.locator('#name').fill('Series Browser Test');await page.locator('#birthday').fill('1980-01-01');await page.locator('#startDate').fill('2000-01-01');await page.locator('#new button.primary').click();await page.locator('#auditionSearch').waitFor();await page.locator('[data-force-audition]').click();await page.locator('[data-close]').click();await page.locator('[data-accept-offer]').click();await page.waitForFunction(()=>JSON.parse(localStorage.getItem('second-take-save-v1')).tvCareers.length===1);await page.locator('[data-leave-series]').waitFor();
+ await jump('2001-12-25');await next();await page.locator('[data-accept-offer]').waitFor();assert.ok((await page.locator('[data-accept-offer]').innerText()).includes('Continue'));assert.equal((await save()).filmography.length,1);await page.locator('[data-accept-offer]').click();assert.equal((await save()).filmography.length,2);assert.equal((await save()).tvCareers[0].lastSeason,2);
+ await page.reload();await page.locator('#auditionSearch').waitFor();assert.equal((await save()).tvCareers.length,1);
+ await jump('2003-12-25');await next();await page.locator('[data-decline-offer]').click();assert.equal((await save()).tvCareers[0].status,'left');assert.equal((await save()).filmography.length,2);
+ console.log('Browser TV fixture passed: season-specific audition, recurring career, return without audition, reload and departure.');
+ const real=await browser.newPage({serviceWorkers:'block'});real.on('pageerror',e=>errors.push(e.message));
+ const data=JSON.parse(gunzipSync(fs.readFileSync('data/tv-seasons/years/2020.json.gz'))),obx=data.projects.find(p=>p.seriesTitle==='Outer Banks'&&p.seasonNumber===1),index=obx.roles.findIndex(r=>/\bJJ\b/.test(r.character));assert.ok(index>=0);
+ await real.goto('http://127.0.0.1:8765');const start=await real.evaluate(async p=>(await import('./engine.js?v=11')).projectSchedule(p).castingStart,obx),role=obx.roles[index];
+ await real.locator('#name').fill('JJ Season Test');await real.locator('#birthday').fill(`${role.birthYear||obx.year-(role.characterAge||44)}-01-01`);await real.locator('#startDate').fill(start);await real.locator('#new button.primary').click();await real.locator('#auditionSearch').waitFor({timeout:120000});await real.locator('#auditionSearch').fill('JJ');await real.locator(`[data-force-audition="${obx.id}"][data-index="${index}"]`).click();await real.locator('[data-close]').click();await real.locator('[data-accept-offer]').click();await real.locator('[data-leave-series]').waitFor();const s=await real.evaluate(()=>JSON.parse(localStorage.getItem('second-take-save-v1')));assert.equal(s.filmography[0].seasonNumber,1);assert.equal(s.tvCareers[0].seriesId,'tmdb-tv-100757');
+ console.log('Real TV test passed: JJ is playable in Outer Banks season 1 with a persistent series career.');
+ assert.deepEqual(errors,[]);await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

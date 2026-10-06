@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "exits": [
+    {
+      "seriesId": "tmdb-tv-100757",
+      "characters": ["JJ", "JJ Maybank"],
+      "afterSeason": 4,
+      "type": "death",
+      "reason": "JJ dies in the season-four finale; a flashback or vision does not imply an ongoing living role.",
+      "source": "https://www.netflix.com/tudum/articles/outer-banks-season-5",
+      "verifiedOn": "2026-10-06"
+    }
+  ],
+  "policy": "Absence from credits establishes an unmapped appearance, not death. Only sourced overrides explicitly label deaths."
+}
