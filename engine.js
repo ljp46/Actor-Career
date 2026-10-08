@@ -1,4 +1,5 @@
-import {ensureRelationships,interact,relationshipTick,recordCollaboration,romanceAllowed} from './relationships.js?v=14';
+import {ensureRelationships,interact,relationshipTick,recordCollaboration,romanceAllowed} from './relationships.js?v=15';
+import {castingReason,offeredFee,settlePayroll,characterIdentity,typecastPressure} from './game-rules.js?v=15';
 export const SAVE_KEY='second-take-save-v1';
 export const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const ageAt=(birth,year,month,day=31)=>year-Number(birth.slice(0,4))-(month<Number(birth.slice(5,7))||month===Number(birth.slice(5,7))&&day<Number(birth.slice(8,10))?1:0);
@@ -97,23 +98,26 @@ export function available(s,catalogue,{includePending=false}={}){
   if(project.legacyOnly||project.contractOnly||won.has(project.id))continue;
   if(project.seriesId&&s.showChanges?.[project.seriesId]?.status==='cancelled'&&project.seasonNumber>s.showChanges[project.seriesId].afterSeason)continue;
   const t=projectSchedule(project);if(date<t.castingStart||date>=t.castingEnd||[...booked,...held].some(b=>t.filmingStart<b.filmingEnd&&b.filmingStart<t.filmingEnd))continue;
-  project.roles.forEach((role,index)=>{const key=`${project.id}:${index}`;if(s.casts[key]||decided.has(key)||pending.has(key))return;if(project.seriesId&&(s.tvCareers||[]).some(c=>c.seriesId===project.seriesId&&c.status==='active'&&c.characterKey===String(role.character).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/\((?:voice|uncredited)\)/gi,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()))return;const fit=roleFit(s,project,role);if(fit>=35)offers.push({project,role,index,fit})})
+  project.roles.forEach((role,index)=>{const key=`${project.id}:${index}`;if(s.casts[key]||decided.has(key)||pending.has(key)||castingReason(s,project,index))return;if(project.seriesId&&(s.tvCareers||[]).some(c=>c.seriesId===project.seriesId&&c.status==='active'&&c.characterKey===String(role.character).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/\((?:voice|uncredited)\)/gi,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()))return;const fit=roleFit(s,project,role);if(fit>=(s.overhaulVersion?51:35))offers.push({project,role,index,fit})})
  }
  return offers.sort((a,b)=>b.fit-a.fit||a.project.title.localeCompare(b.project.title)||a.index-b.index)
 }
 export function recordCastingChange(s,project,role,index,winner){
+ if(s.overhaulVersion&&(project.seriesId||project.collectionId)){s.roleOwners??={};const id=`${project.seriesId||project.collectionId}:${characterIdentity(role.character)}`,prior=s.roleOwners[id];s.roleOwners[id]=prior?.name===winner?prior:{name:winner,originProjectId:project.id,year:project.year}}
  s.worldChanges??=[];if(s.worldChanges.some(c=>c.projectId===project.id&&c.index===index&&c.performer===winner))return;
  s.worldChanges.unshift({projectId:project.id,title:project.title,year:project.year,index,character:role.character,original:role.actor,performer:winner,date:currentDate(s)});if(s.worldChanges.length>1000)s.worldChanges.length=1000
 }
-export function bookRole(s,catalogue,project,role,index){
+export function bookRole(s,catalogue,project,role,index,{returning=false}={}){
  ensureRelationships(s);
  const a=active(s),key=`${project.id}:${index}`;
  if(s.complete||!a.alive||s.filmography.some(f=>f.personId===a.id&&f.projectId===project.id&&f.status!=='withdrawn'))throw Error('This character cannot book that production.');
  if(s.casts[key]&&s.casts[key]!==a.name)throw Error('This part has already been cast.');
+ if(!returning&&castingReason(s,project,index))throw Error(castingReason(s,project,index));
+ if(s.overhaulVersion&&(project.seriesId||project.collectionId)){s.roleOwners??={};for(const r of project.roles){const id=`${project.seriesId||project.collectionId}:${characterIdentity(r.character)}`;s.roleOwners[id]??={name:r.actor,originProjectId:project.id,year:project.year}}}
  const directorName=directorFor(s,project),original=ensurePerson(s,role.actor,'Actor',role.birthYear,role.gender),director=ensurePerson(s,directorName,'Director');
  s.casts[key]=a.name;if(!s.choices.includes(key))s.choices.push(key);
  s.filmography.push({projectId:project.id,title:project.title,year:project.year,kind:project.kind,role:role.character,personId:a.id,original:role.actor,director:directorName});s.filmography.at(-1).status='booked';s.filmography.at(-1).bookedOn=currentDate(s);s.filmography.at(-1).fee=project.year<1980?1200:project.year<2000?8500:28000;s.respect=clamp(s.respect+1,0,100);s.relationships[director.name]??={friendship:0,respect:0,chemistry:0};s.relationships[director.name].respect=clamp(s.relationships[director.name].respect+8,0,100);for(const [i,r] of project.roles.entries()){if(i===index)continue;const costarName=castFor(s,project,i);ensurePerson(s,costarName,'Actor',estimatedBirth(project,r),r.gender);const bond=s.relationships[costarName]??={friendship:0,respect:0,chemistry:0};bond.chemistry=clamp(bond.chemistry+5,0,100);bond.respect=clamp(bond.respect+3,0,100);recordCollaboration(s,s.people.find(p=>p.name===costarName),project)}original.interference++;original.rivalry=clamp(original.rivalry+(original.interference>1?18:5),0,100);if(original.interference>=2)s.timeline.unshift({year:s.year,month:s.month,title:'A rivalry takes shape',body:`You have now won ${original.interference} parts originally associated with ${original.name}. The press begins connecting your careers.`})
- const credit=s.filmography.at(-1);credit.roleIndex=index;recordCastingChange(s,project,role,index,a.name);return credit
+ const credit=s.filmography.at(-1);credit.roleIndex=index;if(s.overhaulVersion){credit.fee=offeredFee(s,project,index);credit.paidNet=0}recordCastingChange(s,project,role,index,a.name);return credit
 }
 export function audition(s,catalogue,project,role,index,{forceWin=false,deferBooking=false,includePending=false}={}){const key=`${project.id}:${index}`;if(!available(s,catalogue,{includePending}).some(o=>o.project.id===project.id&&o.index===index))throw new Error('This audition is closed or conflicts with another shoot.');if(s.choices.includes(key)||s.casts[key])throw new Error('This part has already been decided.');const a=active(s),fit=roleFit(s,project,role);if(fit<35)throw new Error('Your playing age is not close enough for this role.');s.choices.push(key);const directorName=directorFor(s,project),shortlist=auditionShortlist(s,catalogue,project,role,index);for(const c of shortlist)ensurePerson(s,c.name,'Actor',c.birthYear,c.gender);const playerEntry=shortlist.find(c=>c.player),playerWeight=Math.max(1,(playerEntry.fit*.7+s.skills.acting*.65+(/comedy/i.test(project.genre||'')?s.skills.comedy:s.skills.drama)*.25+(s.preparations?.[`${s.activeId}:${project.id}:${index}`]?.score||0)*.45+(s.careerProfiles?.[s.activeId]?.reputation??60)*.15+(s.relationships[directorName]?.respect||0)*.10+(s.relationships[directorName]?.friendship||0)*.03+s.fame*.35+s.representation*5+(s.background==='industry'?8:0)));const weighted=shortlist.map(c=>({...c,weight:c.player?playerWeight:Math.max(1,c.fit*(c.original?1.05:.88)+(hashText(c.name+project.id)%18))}));let roll=rand(s)*weighted.reduce((sum,c)=>sum+c.weight,0),winner=weighted[weighted.length-1];for(const c of weighted){roll-=c.weight;if(roll<=0){winner=c;break}}if(forceWin)winner=weighted.find(c=>c.player);if(winner.player&&deferBooking)return{win:true,winner:winner.name,original:role.actor,fit,shortlist:weighted.map(({name,fit,player,original})=>({name,fit,player,original}))};const win=winner.player===true,original=ensurePerson(s,role.actor,'Actor',role.birthYear,role.gender),director=ensurePerson(s,directorName,'Director');s.casts[key]=winner.name;if(winner.name!==role.actor)recordCastingChange(s,project,role,index,winner.name);if(win){bookRole(s,catalogue,project,role,index)}s.timeline.unshift({year:s.year,month:s.month,title:`Audition: ${project.title}`,body:win?`You won the role of ${role.character}, displacing ${original.name}.`:`${winner.name} won the role of ${role.character}${winner.original?' as in real history':', changing this timeline'}.`});return{win,winner:winner.name,original:original.name,fit,shortlist:weighted.map(({name,fit,player,original})=>({name,fit,player,original}))}}
 export function useActivity(s){const date=currentDate(s);s.weeklyActivities??={week:date,used:0};if(s.weeklyActivities.week!==date)s.weeklyActivities={week:date,used:0};s.energy??=100;if(s.energy<15)throw new Error('You need 15 energy. Rest or advance a week.');s.energy-=15;s.weeklyActivities.used++}
@@ -134,7 +138,8 @@ export function familyCasting(s,catalogue,year){
  const reserved=new Set([
   ...(s.contracts||[]).filter(c=>c.status==='active').flatMap(c=>c.entries.filter(e=>['reserved','offered','booked'].includes(e.status)).map(e=>`${e.project.id}:${e.index}`)),
   ...(s.roleOffers||[]).filter(o=>o.status==='offered').map(o=>`${o.projectId}:${o.index}`),
-  ...(s.careerAuditions||[]).filter(a=>a.status==='callback').map(a=>`${a.projectId}:${a.index}`)
+  ...(s.careerAuditions||[]).filter(a=>a.status==='callback').map(a=>`${a.projectId}:${a.index}`),
+  ...(s.applications||[]).filter(a=>['watching','considering','invited','callback','offered'].includes(a.status)).map(a=>`${a.projectId}:${a.index}`)
  ]);
  for(const p of projects)for(const [i,r] of p.roles.entries())if(p.seriesId&&(s.tvCareers||[]).some(c=>c.status==='active'&&c.seriesId===p.seriesId&&c.characterKey===String(r.character).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/\((?:voice|uncredited)\)/gi,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()))reserved.add(`${p.id}:${i}`);
  for(const f of family){
@@ -152,7 +157,7 @@ export function familyCasting(s,catalogue,year){
    if(rand(s)>=.65)break;
    const options=[];
    for(const p of projects){const t=projectSchedule(p);if(booked.has(p.id)||schedules.some(b=>t.filmingStart<b.filmingEnd&&b.filmingStart<t.filmingEnd))continue;
-    p.roles.forEach((r,i)=>{if(!s.casts[`${p.id}:${i}`]&&!reserved.has(`${p.id}:${i}`)&&genderCompatible(f.gender,r.gender)&&roleFitForAge(year-f.birthYear,r)>=35)options.push({p,r,i})});
+    p.roles.forEach((r,i)=>{if(!s.casts[`${p.id}:${i}`]&&!reserved.has(`${p.id}:${i}`)&&!castingReason(s,p,i)&&genderCompatible(f.gender,r.gender)&&roleFitForAge(year-f.birthYear,r)>=35)options.push({p,r,i})});
    }
    if(!options.length)break;
    const {p,r,i}=pick(s,options);s.casts[`${p.id}:${i}`]=f.name;booked.add(p.id);schedules.push(projectSchedule(p));
@@ -174,14 +179,15 @@ export function applyCheat(s,kind,names=[]){
  }
  return changed
 }
-export function advance(s,catalogue){
+export function advance(s,catalogue,{days=7}={}){
  if(s.complete)return;
  const previous=currentDate(s),year=s.year;
- s.date=addDays(previous,7);s.year=Number(s.date.slice(0,4));s.month=Number(s.date.slice(5,7));s.socialActions={week:s.date,used:0,people:[]};s.weeklyActivities={week:s.date,used:0};s.energy=100;
+ if(!Number.isInteger(days)||days<1||days>7)throw Error('Advance between one and seven days.');
+ s.date=addDays(previous,days);s.year=Number(s.date.slice(0,4));s.month=Number(s.date.slice(5,7));s.socialActions={week:s.date,used:0,people:[]};s.weeklyActivities={week:s.date,used:0};s.energy=Math.min(100,(s.energy??100)+Math.round(100*days/7));
  const a=active(s);
  s.health=clamp(s.health+(rand(s)<.55?1:-1),5,100);
  if(s.year>year){
-  s.money=Math.round(s.money*0.97);
+  if(!s.overhaulVersion)s.money=Math.round(s.money*0.97);
   if(s.year>=2026)for(let y=Math.max(2027,s.year);y<=s.year+2;y++)generatedYear(s,y);
   familyCasting(s,catalogue,s.year+1);
   const age=s.year-a.birthYear,mortality=age<50?.00015:age<75?.002:age<90?.025:.09;
@@ -197,12 +203,13 @@ export function advance(s,catalogue){
   const project=projectById.get(credit.projectId);
   if(!project)continue;
   const t=projectSchedule(project);
+  if(s.overhaulVersion)settlePayroll(s,credit,project,projectSchedule);
   if(credit.status==='booked'&&s.date>=t.filmingStart){credit.status='filming';s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`Filming begins: ${project.title}`,body:`You are on set as ${credit.role}. The shoot is scheduled for about ${t.durationWeeks} weeks.`})}
-  if(credit.status==='filming'&&s.date>=t.filmingEnd){credit.status='post-production';credit.skillsAtWrap={...s.skills};s.money+=Math.round((credit.fee||0)*(1-(credit.agentCommission||0)));s.respect=clamp(s.respect+3,0,100);s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`Wrapped: ${project.title}`,body:`Filming is complete. Your fee has been paid; the release is still ahead.`})}
-  if(credit.status==='post-production'&&s.date>=t.releaseDate){credit.status='released';s.fame=clamp(s.fame+pick(s,[3,5,8,10]),0,100);a.fame=s.fame;s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`Released: ${project.title}`,body:`Audiences can now see your performance as ${credit.role}.`})}
+  if(credit.status==='filming'&&s.date>=t.filmingEnd){credit.status='post-production';credit.skillsAtWrap={...s.skills};if(!s.overhaulVersion)s.money+=Math.round((credit.fee||0)*(1-(credit.agentCommission||0)));s.respect=clamp(s.respect+3,0,100);s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`Wrapped: ${project.title}`,body:`Filming is complete. Your agreed payments are settled; the release is still ahead.`})}
+  if(credit.status==='post-production'&&s.date>=t.releaseDate){credit.status='released';if(!s.overhaulVersion)s.fame=clamp(s.fame+pick(s,[3,5,8,10]),0,100);a.fame=s.fame;s.timeline.unshift({year:s.year,month:s.month,date:s.date,title:`Released: ${project.title}`,body:`Audiences can now see your performance as ${credit.role}.`})}
  }
- if(rand(s)<.04){const event=pick(s,[{title:'An unexpected invitation',body:'A friend invites you to a small industry gathering.',effect:'social'},{title:'A quiet week',body:'Time to rest, practice, or connect with the people around you.',effect:'rest'},{title:'Under the weather',body:'A passing illness disrupts your plans.',effect:'health'}]);s.notifications.push(event)}
- if(s.fame>30&&rand(s)<.025)s.notifications.push({title:'Recognised in public',body:'Someone spots you while you are out. Fame is starting to affect ordinary life.',effect:'fame'});
+ if(!s.overhaulVersion&&rand(s)<.04){const event=pick(s,[{title:'An unexpected invitation',body:'A friend invites you to a small industry gathering.',effect:'social'},{title:'A quiet week',body:'Time to rest, practice, or connect with the people around you.',effect:'rest'},{title:'Under the weather',body:'A passing illness disrupts your plans.',effect:'health'}]);s.notifications.push(event)}
+ if(!s.overhaulVersion&&s.fame>30&&rand(s)<.025)s.notifications.push({title:'Recognised in public',body:'Someone spots you while you are out. Fame is starting to affect ordinary life.',effect:'fame'});
  relationshipTick(s,filmingProjects(s,catalogue).flatMap(p=>p.roles.map((r,i)=>castFor(s,p,i))));
  if(s.timeline.length>250)s.timeline=s.timeline.slice(0,250)
 }
@@ -217,5 +224,5 @@ export function datingApp(s){if(s.year<2012||ageAt(s.birthday,s.year,s.month)<18
 export function haveChild(s,name,gender='unspecified'){const a=active(s);if(ageAt(s.birthday,s.year,s.month)<18)throw new Error('Your character is too young.');name=name.trim();if(!name||s.usedPeople.includes(name))throw new Error('Choose a unique name for the child.');const p=person(s,name,'Child',s.year,'Child',gender);p.birthDate=`${s.year}-${String(s.month).padStart(2,'0')}-01`;s.children.push(p.id);s.timeline.unshift({year:s.year,month:s.month,title:`Welcome, ${name}`,body:`A new generation joins the family. You can switch to them from age four.`});return p}
 export function switchTo(s,id){const p=s.people.find(x=>x.id===id);if(!p||!p.alive||ageAt(p.birthDate||`${p.birthYear}-${s.birthday.slice(5)}`,s.year,s.month)<4)throw new Error('This family member cannot be played yet.');ensureRelationships(s);const former=active(s);former.fame=s.fame;s.activeId=id;ensureRelationships(s);s.energy=100;s.representation=s.careerProfiles?.[id]?.agent?.level||0;s.birthday=p.birthDate||`${p.birthYear}-${s.birthday.slice(5)}`;s.skills={acting:8,comedy:5,drama:5};s.fame=p.fame??clamp(Math.round(former.fame*.18),0,100);s.timeline.unshift({year:s.year,month:s.month,title:'A new point of view',body:`You now live as ${p.name}. The previous character stays in the world.`})}
 export function die(s,p,cause){const wasActive=p.id===s.activeId;if(wasActive)p.fame=s.fame;p.alive=false;const famous=(p.fame||0)>=45;const close=s.children.map(id=>s.people.find(x=>x.id===id)).filter(x=>x?.alive&&s.year-x.birthYear>=4);const headline=famous?`Hollywood mourns ${p.name}`:`Remembering ${p.name}`;const collaborator=s.filmography.find(f=>f.personId===p.id)?.director;const notice={year:s.year,name:p.name,headline,medium:s.year<1985?'Newspaper':s.year<2010?'Television and newspaper':'Social media and news',body:`${p.name} has died at ${s.year-p.birthYear} from ${cause}. ${famous?'Tributes reflect a career that touched audiences across generations.':'Family and friends remember their life.'}`,tributes:collaborator?[`${collaborator} remembers working with ${p.name} on set. (Fictional in-game tribute)`]:[],career:s.filmography.filter(f=>f.personId===p.id).map(f=>f.title)};s.deathNotices.unshift(notice);s.timeline.unshift({year:s.year,month:s.month,title:headline,body:notice.body});if(wasActive){if(close.length)switchTo(s,close[0].id);else s.complete=true}return notice}
-export function castFor(s,p,index){return s.casts[`${p.id}:${index}`]||p.roles[index].actor}
+export function castFor(s,p,index){const owner=s.overhaulVersion&&(p.seriesId||p.collectionId)&&s.roleOwners?.[`${p.seriesId||p.collectionId}:${characterIdentity(p.roles[index].character)}`];return s.casts[`${p.id}:${index}`]||(owner&&owner.year<=p.year&&!p.incumbents?.[index]?.historicalRecast?owner.name:p.roles[index].actor)}
 export function directorFor(s,p){return s.directors[p.id]||p.director}
