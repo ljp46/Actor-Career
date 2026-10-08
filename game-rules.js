@@ -24,20 +24,23 @@ export function castingReason(s,p,index){
  return `Established character: already played in ${lock.firstYear}. Returning roles are not open auditions.`;
 }
 export function projectReach(p){return limit(Math.round(Math.log10(1+Number(p.voteCount||0))*23+Math.log10(1+Number(p.popularity||0))*9),10,100)}
+const assessmentMemo=new WeakMap();
 export function roleAssessment(s,p,index){
+ const epoch=`${s.activeId}:${dateOf(s)}:${s.skills?.acting}:${s.filmography.length}`;let memo=assessmentMemo.get(s);if(!memo||memo.epoch!==epoch){memo={epoch,projects:new WeakMap()};assessmentMemo.set(s,memo)}
+ let cached=memo.projects.get(p);if(!cached){cached=new Map();memo.projects.set(p,cached)}if(cached.has(index))return cached.get(index);
  const role=p.roles[index],h=fingerprint(`${p.id}:${index}`),reach=projectReach(p),episodeShare=role.episodeCount&&p.episodeCount?role.episodeCount/p.episodeCount:null;
  const prominence=role.roleType==='guest'?18:index<3?100:index<8?65:index<16?40:18;
  const billing=prominence>=90?'Lead':prominence>=40?'Supporting':'Guest / featured';
  const scriptBase=limit(Math.round((Number(p.baselineRating)||6.3)*9+(fingerprint(p.id)%17)-8),25,96);
  const qualityBase=limit(Math.round(scriptBase*.65+22+(h%27)-13+(episodeShare===null?0:episodeShare*5)),20,98);
- const experience=s.filmography.filter(c=>c.personId===s.activeId&&c.status==='released').length,uncertainty=Math.max(3,20-experience-(s.skills?.acting||0)/10);
+ const experience=s.filmography.filter(c=>c.personId===s.activeId&&c.status==='released').length,uncertainty=Math.max(3,20-experience-(s.skills?.acting||0)/10-(s.careerProfiles?.[s.activeId]?.agent?.level||0)*2);
  const script=limit(Math.round(scriptBase+((h%101)/50-1)*uncertainty),1,99),quality=limit(Math.round(qualityBase+((h%73)/36-1)*uncertainty),1,99);
  const adjective=n=>n>=85?'Exceptional':n>=70?'Strong':n>=55?'Promising':n>=40?'Uneven':'Uncertain';
  const budget=p.budget>0?p.budget:Math.round((p.kind==='TV series'?2e6:6e5)*Math.pow(1+reach/35,3));
- return {script,quality,scriptBase,qualityBase,prominence,billing,reach,budget,budgetEstimated:!p.budget,
+ const result={script,quality,scriptBase,qualityBase,prominence,billing,reach,budget,budgetEstimated:!p.budget,
   scriptDescription:`${adjective(script)} writing · ${['intimate character story','ambitious structure','accessible crowd-pleaser','demanding emotional material'][h%4]}`,
   roleDescription:`${adjective(quality)} material · ${prominence<40?'small but potentially memorable':prominence<90?'a supporting part with room to stand out':'a substantial character carrying the story'}`,
-  uncertainty:Math.round(uncertainty)};
+  uncertainty:Math.round(uncertainty)};cached.set(index,result);return result;
 }
 export const eraValue=year=>Math.max(.08,Math.min(1.6,Math.pow(1.025,year-2026)));
 export function offeredFee(s,p,index){
@@ -60,6 +63,7 @@ export function syncCalendar(s,projects,schedule){
  const ids=new Set(s.filmography.filter(c=>c.personId===s.activeId&&!['released','withdrawn'].includes(c.status)).map(c=>c.projectId));
  s.productionCalendar=projects.filter(p=>ids.has(p.id)).map(p=>{const t=schedule(p);return {id:p.id,title:p.title,start:t.filmingStart,end:t.filmingEnd}});
  for(const c of (s.contracts||[]).filter(c=>c.personId===s.activeId&&c.status==='active'))for(const e of c.entries.filter(e=>['reserved','offered'].includes(e.status))){const t=schedule(e.project);s.productionCalendar.push({id:e.project.id,title:e.project.title,start:t.filmingStart,end:t.filmingEnd})}
+ for(const c of (s.tvCareers||[]).filter(c=>c.personId===s.activeId&&c.status==='active'&&c.next)){const t=schedule(c.next);if(!s.productionCalendar.some(p=>p.id===c.next.id))s.productionCalendar.push({id:c.next.id,title:c.next.title,start:t.filmingStart,end:t.filmingEnd})}
 }
 export function calendarReason(s,start,end,except=null){
  const clash=[...(s.productionCalendar||[]),...(s.commitments||[]).filter(c=>c.personId===s.activeId&&c.status==='scheduled')].find(c=>c.id!==except&&start<c.end&&c.start<end);

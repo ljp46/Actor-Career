@@ -1,6 +1,6 @@
 // v1.2 career choices. Production dates and story outcomes are game simulations.
 import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=15';
-import {offeredFee,reception,calendarReason,castingReason,typecastPressure} from './game-rules.js?v=15';
+import {offeredFee,reception as releaseReception,calendarReason,castingReason,typecastPressure} from './game-rules.js?v=15';
 
 const datePlus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const key=(s,p,i)=>`${s.activeId}:${p.id}:${i}`;
@@ -214,7 +214,7 @@ export function resolveProductionEvent(s,id,choice){
  const contract=s.contracts.find(c=>c.id===credit.contractId&&c.status==='active');if(contract)contract.unfairDemands=true
 }
 function reviewRelease(s,credit,p){
- if(s.overhaulVersion&&p){const outcome=reception(s,credit,p);credit.outcome=outcome;s.productionOutcomes[credit.projectId]=outcome;log(s,`The verdict: ${credit.title}`,`${outcome.result} · audience ${outcome.audience}/100 · critics ${outcome.critics}/100 · your performance ${outcome.performance}/100. Fame +${outcome.fameGain}.`);return}
+ if(s.overhaulVersion&&p){const outcome=releaseReception(s,credit,p);credit.outcome=outcome;s.productionOutcomes[credit.projectId]=outcome;log(s,`The verdict: ${credit.title}`,`${outcome.result} · audience ${outcome.audience}/100 · critics ${outcome.critics}/100 · your performance ${outcome.performance}/100. Fame +${outcome.fameGain}.`);return}
  const effort=credit.performance?.effort||0,teamwork=credit.performance?.teamwork||0;
  const rating=Number(p?.baselineRating)||6,shock=rand(s)<.15?-28:0,skills=credit.skillsAtWrap||s.skills;
  const collaborators=(p?.roles||[]).map((r,i)=>castFor(s,p,i)).filter(name=>name!==active(s).name),workingRespect=collaborators.length?collaborators.reduce((n,name)=>n+(s.relationships[name]?.respect||0),0)/collaborators.length:0;
