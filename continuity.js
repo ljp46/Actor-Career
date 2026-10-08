@@ -83,7 +83,7 @@ export function materializeReturns(s,catalogue){
   if(s.filmography.some(f=>f.personId===c.personId&&f.projectId===p.id&&f.status!=='withdrawn'))continue;
   if(pendingOffers(s).some(o=>o.projectId===p.id&&o.index===index))continue;
   if(!genderCompatible(active(s).gender,role.gender))continue;
-  makeOffer(s,target,index,{source:request.alternate?'alternate-return':'tv-return',tvCareerId:c.seriesId?c.id:null,fee:c.lastFee||28000,expiresOn:t.filmingStart});
+  makeOffer(s,target,index,{source:request.alternate?'alternate-return':'tv-return',tvCareerId:c.seriesId?c.id:null,fee:s.overhaulVersion?Math.round(Math.max(c.lastFee||0,offeredFee(s,target,index))*(1+(c.fans||0)/500)):c.lastFee||28000,expiresOn:t.filmingStart});
   if(c.seriesId)c.next={id:target.id,year:target.year,releaseDate:target.releaseDate,kind:target.kind,voteCount:target.voteCount,popularity:target.popularity,filmingStartDate:target.filmingStartDate,filmingEndDate:target.filmingEndDate,castingStartDate:target.castingStartDate};
  }
  s.continuityRequests=s.continuityRequests.filter(r=>{const p=projects(s,catalogue).find(p=>p.id===r.projectId);return !p||currentDate(s)<projectSchedule(p).filmingStart});
@@ -148,3 +148,4 @@ export function continuityTick(s,catalogue,{shows={},franchises={collections:{}}
  }
  materializeReturns(s,catalogue);
 }
+import {offeredFee} from './game-rules.js?v=15';

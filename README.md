@@ -2,13 +2,23 @@
 
 A mobile-first alternate-history actor life sim. Choose a birthday and starting date, audition inside a living film/TV world, change casting history, build a family and relationships, spend career earnings, and continue into procedurally generated future decades.
 
-## Version 1.4 · People and relationships
+## Version 1.5 · Life and career overhaul
+
+Today highlights at most five opportunities: two strong fits, one breakthrough, one eligible direct offer and one pursued application. World has stage filters, historical-year browsing and paginated individual-role applications above 50% fit. Register interest before casting; invitations, preparation, automatic auditions and callbacks lead to negotiable offers. Returning characters in later seasons and sequels remain occupied, including when starting midway through a franchise. Existing player returns use the contract and renewal systems. Explicit vacancies or the separate **Allow recasting** cheat permit intentional recasts.
+
+Released work drives faster early fame gains and a slower climb at the top. Industry reputation and public image are separate; repeated franchise performances build a known-for identity that can constrain contrasting work. Different released roles, independent recognition and refusing familiar work can help reinvention. Fees reflect production budget, billing, era, fame and representation. Film instalments and proportional TV filming payments replace one flat wrap payment. Script and role assessments show uncertain scores and descriptions. Living arrangements, homes, cars and luxuries have ongoing costs and can be sold.
+
+Relationships add trust, affection, compatibility, intentions, independent NPC partners, deeper conversations, shared activities, cohabitation, engagement and weddings. Meet people through community, introductions, work, parties, premieres and era-appropriate dating routes, including Tinder and selective Raya-style networking. Ordinary outings no longer skip a week. Fewer, larger decision pop-ups pause on important dates and preserve remaining days for **Resume**. Public appearances can generate speculation; private and public relationships bring different pressures. Filming dilemmas, promotional interviews, distinct release results and major/independent awards connect personal life and career. Award nominations invite you before results are decided, with options to decline, go alone or choose a guest; attendance does not affect winning. Accepted productions, holidays, publicity and ceremonies obey calendar conflicts.
+
+Existing version-1 saves migrate in place without repaying past earnings or discarding outstanding bookings. Historical dates without documented shooting schedules, missing budgets, assessments, reviews, awards and all relationships are explicitly simulated. Casting locks are regenerated offline from saved season and franchise histories with `scripts/build_casting_history.py`; incomplete historical casts cannot establish a missing character's first appearance. Spin-offs/revivals remain planned for v1.6, expanded health/death/legacy for v1.7.
+
+## People and relationship foundations
 
 People now have individual profiles with friendship, professional respect, chemistry, commitment, personality, preferences and a bounded shared history. Meet new fictional people at local gatherings, parties, industry events and modern dating apps. Existing collaborators and friendships carry over from older saves.
 
 Dating starts at 13 with unrelated teenagers within two years of each other; adult dating and all private-night interactions require both characters to be 18 or older. Other characters can initiate dating or exclusivity, and the player may accept, decline or take things slowly. Attraction and commitment are independent: cheats do not guarantee consent. Rejections create a period of space while ordinary conversations stay available. Romance can remain private, become public, end, or be rebuilt later. Long shoots and lack of quality time can strain relationships. Repeated productions build professional history; fame brings era-appropriate relationship coverage.
 
-Ordinary conversations have no click limit, with diminishing gains from repetition. Training and on-set activities use 15 energy; outings and meetups use 20 plus their stated costs. Social outings advance one week through the same calendar, production, contract and TV-continuity logic as manual advancement. Rest advances one week and restores energy. Each playable family member has their own relationships, so switching to a child does not inherit a parent's romances. The interface adapts to phone and desktop screens.
+Ordinary conversations have no click limit, with diminishing gains from repetition. Training and on-set activities use 15 energy; outings and meetups use 20 plus their stated costs. Small outings fit around work; holidays reserve seven days. Rest advances one week and restores energy. Each playable family member has their own relationships, so switching to a child does not inherit a parent's romances. The interface adapts to phone and desktop screens.
 
 ## Historical world
 
@@ -28,7 +38,7 @@ The 1960–2026 import has finished. The old full-year workflow is paused; futur
 
 `scripts/pack_catalogue.py` builds the full index and lossless compressed runtime files from validated year JSON. `scripts/audit_catalogue.js` checks the compressed files, manifest totals, and every matching role across film/TV casting profiles for all 67 years before publication.
 
-Auditions include all undecided roles in selected productions meeting the 35% minimum fit and gender rule while their casting window is open. Search and 20-role pages let players reach the entire eligible list; there is no twelve-role cap. A successful casting removes other roles in the same production for that player.
+Applications include undecided, unoccupied roles in selected productions with more than 50% fit and compatible gender while casting is open. World search and individual-role pages reach the full eligible selection. A successful casting removes other roles in the same production for that player.
 The browser never receives the API token.
 
 ## Gender-aware casting
@@ -43,7 +53,7 @@ New lives accept a birth date (1900–2100) and an independent starting date (19
 
 Settings → Cheats has separate buttons to maximise acting, drama and comedy. Select one known person or all known castmates, then separately maximise friendship, professional respect or romantic chemistry. Romantic chemistry retains adult and family restrictions; it does not automatically create a dating relationship. Cheats save immediately and do not consume weekly activities.
 
-Each eligible audition also has a **Force win (cheat)** button. In v1.2 this guarantees a non-binding offer for that specific role; explicitly accept it to book the shoot. **Attend audition** retains normal chance-based shortlisting and callbacks. Casting windows, age/gender fit and shoot conflicts still apply.
+Each eligible audition also has a **Force win (cheat)** button, guaranteeing a non-binding offer for that specific role; explicitly accept it to book the shoot. Normal applications and automatic auditions retain chance-based decisions. Casting windows, age/gender fit, returning-character ownership and shoot conflicts still apply. **Allow recasting** separately opens established characters when you intentionally want to change continuity.
 
 ## v1.2: career choices and franchise commitments
 

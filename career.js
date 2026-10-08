@@ -158,6 +158,7 @@ export function acceptCareerOffer(s,catalogue,id,data,{multiFilm=false}={}){
  }
  if(p.kind==='Film'&&p.collectionId&&!s.filmCareers.some(c=>c.personId===s.activeId&&c.lastProjectId===p.id))s.filmCareers.push({id:`film-career-${s.nextId++}`,personId:s.activeId,collectionId:p.collectionId,character:role.character,characterKey:characterKey(role.character),lastProjectId:p.id,handled:false});
  offer.status='accepted';
+ if(s.overhaulVersion)for(const a of s.applications||[])if(a.personId===s.activeId&&a.projectId===p.id&&['watching','considering','invited','callback','offered'].includes(a.status))a.status=a.index===offer.index?'accepted':'withdrawn';
  if(offer.contractId){const c=s.contracts.find(c=>c.id===offer.contractId),entry=c?.entries.find(e=>e.project.id===p.id);if(entry){entry.status='booked';credit.creativeRisk=entry.troubled}}
  for(const other of pendingOffers(s))if(other.projectId===p.id){other.status='superseded'}
  log(s,'Role accepted',`${p.title}: you will play ${role.character}. ${s.overhaulVersion?p.kind==='TV series'?'Season pay arrives as filming progresses.':'Payments arrive at the start, midpoint and wrap.':'Payment is due at wrap.'} Agreed agent commission is deducted.`);return {credit,contract}
