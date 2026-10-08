@@ -1,5 +1,6 @@
 // v1.2 career choices. Production dates and story outcomes are game simulations.
-import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=14';
+import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=15';
+import {offeredFee,reception as releaseReception,calendarReason,castingReason,typecastPressure} from './game-rules.js?v=15';
 
 const datePlus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const key=(s,p,i)=>`${s.activeId}:${p.id}:${i}`;
@@ -56,7 +57,7 @@ export function makeOffer(s,p,index,{source='callback',forced=false,contractId=n
  const existing=pendingOffers(s).find(o=>o.projectId===p.id&&o.index===index);if(existing)return existing;
  const profile=careerProfile(s),agent=profile.agent;
  const offer={id:`offer-${s.nextId++}`,personId:s.activeId,projectId:p.id,year:p.year,title:p.title,index,character:p.roles[index].character,status:'offered',source,forced,contractId,
-  fee:fee??Math.round(baseFee(p)*(1+s.fame/100+(agent?.level||0)*.12)),agentCommission:agent?.commission||0,
+  fee:fee??(s.overhaulVersion?offeredFee(s,p,index):Math.round(baseFee(p)*(1+s.fame/100+(agent?.level||0)*.12))),agentCommission:agent?.commission||0,
   expiresOn:expiresOn||[datePlus(currentDate(s),14),projectSchedule(p).castingEnd].sort()[0],negotiated:false,tvCareerId};
  s.roleOffers.push(offer);log(s,source==='contract'?'Your franchise return':'A role offer',`${p.title} wants you as ${offer.character}. Review the dates and terms before accepting.`);return offer
 }
@@ -64,9 +65,10 @@ export function startAudition(s,catalogue,p,index,{forceWin=false}={}){
  ensureCareer(s);const role=p.roles[index];
  if(!available(s,catalogue).some(o=>o.project.id===p.id&&o.index===index))throw Error('This audition is unavailable or conflicts with another commitment.');
  if(forceWin)return {stage:'offer',offer:makeOffer(s,p,index,{source:'cheat',forced:true})};
- const profile=careerProfile(s),score=roleFit(s,p,role)*.35+s.skills.acting*.20+genreSkill(s,p)*.10+profile.reputation*.15+preparation(s,p,index)*.35+(profile.agent?.level||0)*4;
+ const profile=careerProfile(s),score=roleFit(s,p,role)*.35+s.skills.acting*.20+genreSkill(s,p)*.10+profile.reputation*.15+preparation(s,p,index)*.35+(profile.agent?.level||0)*4-(s.overhaulVersion?typecastPressure(s,p,index):0);
  const chance=clamp(score/100,.08,.92);
  if(rand(s)>chance){s.choices.push(`${p.id}:${index}`);s.casts[`${p.id}:${index}`]=role.actor;log(s,`Audition: ${p.title}`,`You were not invited to the callback for ${role.character}. Another production may be a better opportunity.`);return {stage:'rejected'}}
+ if(s.overhaulVersion&&Number(p.voteCount||0)<250&&Number(p.popularity||0)<15)return {stage:'offer',offer:makeOffer(s,p,index,{source:'audition'})};
  const end=projectSchedule(p).castingEnd,callback={id:`callback-${s.nextId++}`,personId:s.activeId,projectId:p.id,year:p.year,title:p.title,index,character:role.character,status:'callback',readyOn:[datePlus(currentDate(s),7),datePlus(end,-1)].sort()[0],expiresOn:end};
  s.careerAuditions.push(callback);log(s,'A callback invitation',`${p.title} invites you back for ${role.character}. The final casting decision is still ahead.`);return {stage:'callback',callback}
 }
@@ -84,6 +86,7 @@ export function searchAgentOffers(s,catalogue){
  const profile=careerProfile(s);if(!profile.agent)throw Error('Hire an agent first.');
  if(profile.lastSearch===currentDate(s))throw Error('Your agent has already searched this week.');
  profile.lastSearch=currentDate(s);
+ if(s.overhaulVersion&&s.fame<50){log(s,'Your agent checks casting','Direct offers unlock at 50 fame. Browse World and apply for open roles now.');return 0}
  const candidates=available(s,catalogue).filter(o=>o.fit>=50).slice(0,30),chosen=[];
  while(candidates.length&&chosen.length<2){const candidate=pick(s,candidates);candidates.splice(candidates.indexOf(candidate),1);if(chosen.some(o=>o.project.id===candidate.project.id))continue;chosen.push(candidate)}
  const room=Math.max(0,4-pendingOffers(s).length);let count=0;
@@ -125,7 +128,7 @@ export function franchisePlan(s,p,index,data){
 export function reservations(s){return (s.contracts||[]).filter(c=>c.personId===s.activeId&&c.status==='active').flatMap(c=>c.entries.filter(e=>e.status==='reserved'||e.status==='offered').map(e=>({contractId:c.id,entry:e,schedule:projectSchedule(e.project)})))}
 export function offerConflict(s,catalogue,p,exceptContract=null){
  const t=projectSchedule(p),ids=new Set(s.filmography.filter(f=>f.personId===s.activeId&&f.status!=='withdrawn').map(f=>f.projectId));
- return allProjects(s,catalogue).some(booked=>ids.has(booked.id)&&booked.id!==p.id&&intersects(t,projectSchedule(booked)))||reservations(s).some(r=>r.contractId!==exceptContract&&r.entry.project.id!==p.id&&intersects(t,r.schedule))||s.tvCareers?.some(c=>c.personId===s.activeId&&c.status==='active'&&c.next&&c.next.id!==p.id&&intersects(t,projectSchedule(c.next)))
+ return (s.overhaulVersion&&s.commitments?.some(c=>c.personId===s.activeId&&c.status==='scheduled'&&t.filmingStart<c.end&&c.start<t.filmingEnd))||allProjects(s,catalogue).some(booked=>ids.has(booked.id)&&booked.id!==p.id&&intersects(t,projectSchedule(booked)))||reservations(s).some(r=>r.contractId!==exceptContract&&r.entry.project.id!==p.id&&intersects(t,r.schedule))||s.tvCareers?.some(c=>c.personId===s.activeId&&c.status==='active'&&c.next&&c.next.id!==p.id&&intersects(t,projectSchedule(c.next)))
 }
 export function acceptCareerOffer(s,catalogue,id,data,{multiFilm=false}={}){
  ensureCareer(s);const offer=pendingOffers(s).find(o=>o.id===id),p=offer&&lookup(s,catalogue,offer.projectId);
@@ -144,7 +147,7 @@ export function acceptCareerOffer(s,catalogue,id,data,{multiFilm=false}={}){
   if(p.generated&&!data.collections?.[cid]){p.collectionId=cid;for(const entry of plan){if(!s.projects.some(x=>x.id===entry.project.id))s.projects.push(entry.project);if(!s.usedTitles.includes(entry.project.title))s.usedTitles.push(entry.project.title)}s.customCollections[cid]={id:cid,name:contract.name,parts:[p,...plan.map(e=>e.project)]}}
   s.contracts.push(contract);log(s,'A multi-film commitment',`You sign for ${p.title} and ${plan.length} returning appearances as ${role.character}. Future shoots are reserved; refusing a required return ends the deal.`)
  }
- const credit=bookRole(s,catalogue,p,role,offer.index);
+ const credit=bookRole(s,catalogue,p,role,offer.index,{returning:Boolean(offer.tvCareerId||offer.contractId||offer.source==='alternate-return')});
  credit.fee=Math.round(offer.fee*(multiFilm?1.10:1));credit.agentCommission=offer.agentCommission;credit.contractId=offer.contractId||contract?.id||null;credit.performance={effort:0,teamwork:0,pressure:0};
  if(p.generated&&p.kind==='TV series'&&!p.seriesId){p.seriesId=p.id;p.seriesTitle=p.title;p.seasonNumber=1}
  if(p.seriesId){
@@ -155,9 +158,10 @@ export function acceptCareerOffer(s,catalogue,id,data,{multiFilm=false}={}){
  }
  if(p.kind==='Film'&&p.collectionId&&!s.filmCareers.some(c=>c.personId===s.activeId&&c.lastProjectId===p.id))s.filmCareers.push({id:`film-career-${s.nextId++}`,personId:s.activeId,collectionId:p.collectionId,character:role.character,characterKey:characterKey(role.character),lastProjectId:p.id,handled:false});
  offer.status='accepted';
+ if(s.overhaulVersion)for(const a of s.applications||[])if(a.personId===s.activeId&&a.projectId===p.id&&['watching','considering','invited','callback','offered'].includes(a.status))a.status=a.index===offer.index?'accepted':'withdrawn';
  if(offer.contractId){const c=s.contracts.find(c=>c.id===offer.contractId),entry=c?.entries.find(e=>e.project.id===p.id);if(entry){entry.status='booked';credit.creativeRisk=entry.troubled}}
  for(const other of pendingOffers(s))if(other.projectId===p.id){other.status='superseded'}
- log(s,'Role accepted',`${p.title}: you will play ${role.character}. Payment is due at wrap, with any agreed agent commission deducted.`);return {credit,contract}
+ log(s,'Role accepted',`${p.title}: you will play ${role.character}. ${s.overhaulVersion?p.kind==='TV series'?'Season pay arrives as filming progresses.':'Payments arrive at the start, midpoint and wrap.':'Payment is due at wrap.'} Agreed agent commission is deducted.`);return {credit,contract}
 }
 export function terminateContract(s,id,reason='creative concerns'){
  ensureCareer(s);const contract=s.contracts.find(c=>c.id===id&&c.personId===s.activeId&&c.status==='active');if(!contract)throw Error('This contract is not active.');
@@ -177,6 +181,7 @@ export function declineCareerOffer(s,id){
  if(offer.tvCareerId)return leaveSeries(s,offer.tvCareerId);
  if(offer.contractId)return terminateContract(s,offer.contractId,'refusing the next film');
  offer.status='declined';if(!s.choices.includes(`${offer.projectId}:${offer.index}`))s.choices.push(`${offer.projectId}:${offer.index}`);
+ offer.declinedOn=currentDate(s);if(s.overhaulVersion){const life=s.lifeProfiles?.[s.activeId],top=Object.values(life?.identities||{}).find(i=>i.character===offer.character);if(top)top.strength=Math.max(0,top.strength-2)}
  log(s,'Choosing a different path',`You decline ${offer.title}. No franchise obligation was signed.`)
 }
 export function leaveSeries(s,id){
@@ -210,6 +215,7 @@ export function resolveProductionEvent(s,id,choice){
  const contract=s.contracts.find(c=>c.id===credit.contractId&&c.status==='active');if(contract)contract.unfairDemands=true
 }
 function reviewRelease(s,credit,p){
+ if(s.overhaulVersion&&p){const outcome=releaseReception(s,credit,p);credit.outcome=outcome;s.productionOutcomes[credit.projectId]=outcome;log(s,`The verdict: ${credit.title}`,`${outcome.result} · audience ${outcome.audience}/100 · critics ${outcome.critics}/100 · your performance ${outcome.performance}/100. Fame +${outcome.fameGain}.`);return}
  const effort=credit.performance?.effort||0,teamwork=credit.performance?.teamwork||0;
  const rating=Number(p?.baselineRating)||6,shock=rand(s)<.15?-28:0,skills=credit.skillsAtWrap||s.skills;
  const collaborators=(p?.roles||[]).map((r,i)=>castFor(s,p,i)).filter(name=>name!==active(s).name),workingRespect=collaborators.length?collaborators.reduce((n,name)=>n+(s.relationships[name]?.respect||0),0)/collaborators.length:0;
@@ -236,8 +242,9 @@ export function careerTick(s,catalogue,data){
   if(credit.status==='released'&&!credit.outcome&&!credit.legacyOutcome)reviewRelease(s,credit,lookup(s,catalogue,credit.projectId));
   if(credit.status!=='filming')continue;
   const t=lookup(s,catalogue,credit.projectId);if(!t)continue;
-  if(credit.lastSetEvent===date||s.productionEvents.some(e=>e.projectId===credit.projectId&&e.status==='open')||rand(s)>.10)continue;
+  if(credit.lastSetEvent===date||s.productionEvents.some(e=>e.projectId===credit.projectId&&e.status==='open')||s.overhaulVersion&&(s.lifeEvents?.some(e=>e.status==='open'&&e.personId===s.activeId)||s.lastProductionDilemma&&date<datePlus(s.lastProductionDilemma,28))||rand(s)>.10)continue;
   credit.lastSetEvent=date;
+  if(s.overhaulVersion)s.lastProductionDilemma=date;
   s.productionEvents.push({id:`set-${s.nextId++}`,personId:s.activeId,projectId:credit.projectId,status:'open',createdOn:date,title:`Pressure on ${credit.title}`,body:'In this fictional production, an unreasonable request for extra takes and an exhausting schedule puts you in a difficult position.'})
   const contract=s.contracts.find(c=>c.id===credit.contractId&&c.status==='active');if(contract)contract.unfairDemands=true
  }
