@@ -100,18 +100,37 @@ export function reception(s,c,p){
  return {personId:s.activeId,projectId:p.id,title:p.title,date:dateOf(s),performance,reception:audience,audience,critics,commercial,result,fameGain:gain,fictional:true};
 }
 export const assets=[
- {id:'wardrobe',name:'Premiere wardrobe',kind:'luxury',price:2000,monthly:0,minAge:16},
- {id:'car',name:'Everyday car',kind:'car',price:18000,monthly:180,minAge:17},
+ {id:'studio',name:'Studio flat',kind:'home',price:90000,monthly:350,minAge:18},
  {id:'flat',name:'City apartment',kind:'home',price:150000,monthly:650,minAge:18},
+ {id:'townhouse',name:'Townhouse',kind:'home',price:420000,monthly:1200,minAge:18},
  {id:'home',name:'Family house',kind:'home',price:650000,monthly:1800,minAge:18},
- {id:'luxury-car',name:'Luxury sports car',kind:'car',price:240000,monthly:1800,minAge:18},
+ {id:'beach-house',name:'Beach house',kind:'home',price:1800000,monthly:5200,minAge:18},
+ {id:'penthouse',name:'Penthouse',kind:'home',price:3500000,monthly:9000,minAge:18},
+ {id:'ranch',name:'Country ranch',kind:'home',price:2600000,monthly:7000,minAge:18},
  {id:'mansion',name:'Private estate',kind:'home',price:5e6,monthly:15000,minAge:18},
+ {id:'bike',name:'Bicycle',kind:'car',price:350,monthly:0,minAge:8},
+ {id:'used-car',name:'Used hatchback',kind:'car',price:4500,monthly:90,minAge:17},
+ {id:'car',name:'Everyday car',kind:'car',price:18000,monthly:180,minAge:17},
+ {id:'motorbike',name:'Motorbike',kind:'car',price:9000,monthly:120,minAge:17},
+ {id:'electric',name:'Electric saloon',kind:'car',price:45000,monthly:150,minAge:17,minYear:2012},
+ {id:'suv',name:'Big SUV',kind:'car',price:70000,monthly:400,minAge:17,minYear:1985},
+ {id:'classic',name:'Classic convertible',kind:'car',price:65000,monthly:500,minAge:17},
+ {id:'luxury-car',name:'Luxury sports car',kind:'car',price:240000,monthly:1800,minAge:18},
+ {id:'supercar',name:'Supercar',kind:'car',price:450000,monthly:3000,minAge:18,minYear:1970},
+ {id:'wardrobe',name:'Premiere wardrobe',kind:'luxury',price:2000,monthly:0,minAge:16},
+ {id:'watch',name:'Designer watch',kind:'luxury',price:25000,monthly:0,minAge:16},
+ {id:'piano',name:'Grand piano',kind:'luxury',price:30000,monthly:50,minAge:10},
  {id:'jewellery',name:'Jewellery collection',kind:'luxury',price:80000,monthly:120,minAge:18},
+ {id:'art',name:'Contemporary painting',kind:'collectible',price:250000,monthly:100,minAge:18},
+ {id:'wine',name:'Wine cellar',kind:'collectible',price:60000,monthly:80,minAge:21},
  {id:'yacht',name:'Private yacht',kind:'luxury',price:3e6,monthly:25000,minAge:18,minYear:1970},
- {id:'jet',name:'Private jet',kind:'luxury',price:18e6,monthly:110000,minAge:18,minYear:1970}
+ {id:'jet',name:'Private jet',kind:'luxury',price:18e6,monthly:110000,minAge:18,minYear:1970},
+ {id:'island',name:'Private island',kind:'home',price:25e6,monthly:60000,minAge:21,minYear:1970}
 ];
 export const lifestyles={family:{name:'Family home / shared living',monthly:0},modest:{name:'Independent, modest living',monthly:1400},comfortable:{name:'Comfortable lifestyle',monthly:5000},luxury:{name:'Luxury lifestyle',monthly:25000}};
-export function monthlyCosts(s){const p=ensureOverhaul(s),owned=(s.possessions||[]).filter(a=>a.ownerId===s.activeId);return Math.round(((lifestyles[p.lifestyle]?.monthly||0)+owned.reduce((n,a)=>n+(assets.find(x=>x.id===a.id)?.monthly||0),0))*eraValue(s.year))}
+export function monthlyCosts(s){const p=ensureOverhaul(s),owned=(s.possessions||[]).filter(a=>a.ownerId===s.activeId),ownsHome=owned.some(a=>assets.find(x=>x.id===a.id)?.kind==='home'),pets=(s.pets||[]).filter(x=>x.ownerId===s.activeId&&x.alive).reduce((n,x)=>n+(x.monthly||0),0);return Math.round(((lifestyles[p.lifestyle]?.monthly||0)*(ownsHome?.35:1)+pets+owned.reduce((n,a)=>n+(assets.find(x=>x.id===a.id)?.monthly||0),0))*eraValue(s.year))}
+// What an owned asset would sell for today. Homes and collectibles appreciate; vehicles and luxuries lose value.
+export function assetValue(s,owned){const a=assets.find(x=>x.id===owned.id),paid=owned.paid||(a?a.price*eraValue(owned.year):0),years=Math.max(0,s.year-owned.year),market=.9+(fingerprint(owned.id+':'+s.year+':'+(owned.year||0))%21)/100;return Math.round(paid*market*(['home','collectible'].includes(a?.kind)?Math.min(2.4,1+years*.03):a?.kind==='car'?Math.max(.15,.82-years*.06):Math.max(.3,.85-years*.03)))}
 export function economyTick(s){
  const p=ensureOverhaul(s),date=dateOf(s);p.lastCharge??=date;
  const elapsed=daysBetween(p.lastCharge,date);if(elapsed<7)return;

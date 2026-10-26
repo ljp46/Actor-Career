@@ -1,6 +1,6 @@
 // v1.2 career choices. Production dates and story outcomes are game simulations.
-import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=15';
-import {offeredFee,reception as releaseReception,calendarReason,castingReason,typecastPressure} from './game-rules.js?v=15';
+import {active,currentDate,clamp,rand,pick,available,audition,bookRole,roleFit,projectSchedule,useActivity,castFor,ensurePerson,genderCompatible} from './engine.js?v=16';
+import {offeredFee,reception as releaseReception,calendarReason,castingReason,typecastPressure} from './game-rules.js?v=16';
 
 const datePlus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const key=(s,p,i)=>`${s.activeId}:${p.id}:${i}`;
@@ -147,7 +147,7 @@ export function acceptCareerOffer(s,catalogue,id,data,{multiFilm=false}={}){
   if(p.generated&&!data.collections?.[cid]){p.collectionId=cid;for(const entry of plan){if(!s.projects.some(x=>x.id===entry.project.id))s.projects.push(entry.project);if(!s.usedTitles.includes(entry.project.title))s.usedTitles.push(entry.project.title)}s.customCollections[cid]={id:cid,name:contract.name,parts:[p,...plan.map(e=>e.project)]}}
   s.contracts.push(contract);log(s,'A multi-film commitment',`You sign for ${p.title} and ${plan.length} returning appearances as ${role.character}. Future shoots are reserved; refusing a required return ends the deal.`)
  }
- const credit=bookRole(s,catalogue,p,role,offer.index,{returning:Boolean(offer.tvCareerId||offer.contractId||offer.source==='alternate-return')});
+ const credit=bookRole(s,catalogue,p,role,offer.index,{returning:Boolean(offer.tvCareerId||offer.contractId||['alternate-return','spinoff','revival','legacy-sequel'].includes(offer.source))});
  credit.fee=Math.round(offer.fee*(multiFilm?1.10:1));credit.agentCommission=offer.agentCommission;credit.contractId=offer.contractId||contract?.id||null;credit.performance={effort:0,teamwork:0,pressure:0};
  if(p.generated&&p.kind==='TV series'&&!p.seriesId){p.seriesId=p.id;p.seriesTitle=p.title;p.seasonNumber=1}
  if(p.seriesId){

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {createCareer,available,bookRole,advance,person,projectSchedule,castFor} from '../engine.js?v=15';
-import {careerTick,careerProfile,makeOffer,acceptCareerOffer,declineCareerOffer} from '../career.js?v=15';
-import {migrateOverhaul,applyRole,submitAudition,forceRole,applicationTick,featuredOpportunities,socialProfile,socialAction,meetThrough,overhaulTick,resolveLifeEvent,guestEligible} from '../overhaul.js?v=15';
-import {castingReason,offeredFee,settlePayroll,ensureOverhaul,roleAssessment,reception,typecastPressure,knownFor,queueEvent,openLifeEvent,calendarReason,reserve,economyTick,plusDays} from '../game-rules.js?v=15';
-import {bond,interactionReason,relationshipTick} from '../relationships.js?v=15';
-import {materializeReturns} from '../continuity.js?v=15';
+import {createCareer,available,bookRole,advance,person,projectSchedule,castFor} from '../engine.js?v=16';
+import {careerTick,careerProfile,makeOffer,acceptCareerOffer,declineCareerOffer} from '../career.js?v=16';
+import {migrateOverhaul,applyRole,submitAudition,forceRole,applicationTick,featuredOpportunities,socialProfile,socialAction,meetThrough,overhaulTick,resolveLifeEvent,guestEligible} from '../overhaul.js?v=16';
+import {castingReason,offeredFee,settlePayroll,ensureOverhaul,roleAssessment,reception,typecastPressure,knownFor,queueEvent,openLifeEvent,calendarReason,reserve,economyTick,plusDays} from '../game-rules.js?v=16';
+import {bond,interactionReason,relationshipTick} from '../relationships.js?v=16';
+import {materializeReturns} from '../continuity.js?v=16';
 const production=(id='one',options={})=>({id,title:id,year:2020,kind:'Film',director:'Director',genre:'Drama',releaseDate:'2020-12-01',filmingStartDate:'2020-03-01',filmingEndDate:'2020-05-01',castingStartDate:'2020-01-01',voteCount:5000,popularity:50,baselineRating:8,roles:[{character:'Alex',actor:'Historical Star',birthYear:1996,gender:'male',ageMin:18,ageMax:30,characterAge:24}],...options});
 function fixture(projects=[production()]){const s=createCareer({name:'Test Actor',birthday:'1996-01-01',startDate:'2020-01-01',gender:'male'},projects);migrateOverhaul(s,projects);s.money=100000;s.skills={acting:90,drama:90,comedy:90};return s}
 function jump(s,date){s.date=date;s.year=+date.slice(0,4);s.month=+date.slice(5,7)}
