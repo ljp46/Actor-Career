@@ -1,6 +1,6 @@
 // Credits establish appearances, not a death. Explicit story exits require a sourced override.
-import {active,currentDate,projectSchedule,rand,clamp,genderCompatible} from './engine.js?v=15';
-import {ensureCareer,characterKey,makeOffer,pendingOffers,leaveSeries} from './career.js?v=15';
+import {active,currentDate,projectSchedule,rand,clamp,genderCompatible} from './engine.js?v=16';
+import {ensureCareer,characterKey,makeOffer,pendingOffers,leaveSeries} from './career.js?v=16';
 
 const plus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const log=(s,title,body)=>s.timeline.unshift({year:s.year,month:s.month,date:currentDate(s),title,body});
@@ -128,7 +128,7 @@ export function continuityTick(s,catalogue,{shows={},franchises={collections:{}}
    const ongoing=!show||['Returning Series','In Production','Planned'].includes(show.status);
    if(ongoing&&base){
     if(base.alternateSeason&&decide(s,`alternate-cancel:${c.id}:${c.lastSeason}`,performance<45?.45:.08)){c.status='ended';s.showChanges[c.seriesId]={status:'cancelled',afterSeason:c.lastSeason,date:currentDate(s)};mark(s,`The network decides against another season of ${c.title} in this timeline.`,{seriesId:c.seriesId,type:'cancellation'});continue}
-    const p=fictionalSeason(s,c,base,{year:Math.max(2027,base.year+1)});
+    const p=fictionalSeason(s,c,base,base.year>=2026?{year:Math.max(2027,base.year+1)}:{});
     const index=p.roles.findIndex(r=>characterKey(r.character)===c.characterKey);if(index>=0)requestReturn(s,c,{...p,index});
    }else if(!show?.seasons.length){continue}
    else if(base&&threshold&&decide(s,`save-show:${c.id}:${c.lastSeason}`,show.status==='Canceled'?.65:.25)){
@@ -148,4 +148,4 @@ export function continuityTick(s,catalogue,{shows={},franchises={collections:{}}
  }
  materializeReturns(s,catalogue);
 }
-import {offeredFee} from './game-rules.js?v=15';
+import {offeredFee} from './game-rules.js?v=16';

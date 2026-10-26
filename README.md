@@ -1,6 +1,29 @@
 # Second Take
 
-A mobile-first alternate-history actor life sim. Choose a birthday and starting date, audition inside a living film/TV world, change casting history, build a family and relationships, spend career earnings, and continue into procedurally generated future decades.
+A mobile-first alternate-history actor life sim. Choose a birthday and starting date, audition inside a living film/TV world, change casting history, build a family and relationships, spend your earnings, and live until the very end.
+
+## Version 1.7 · A whole life
+
+**New look.** A BitLife-style layout built for phones: your name, age, money and date are pinned at the top; your life story scrolls by age; stat bars for Happiness, Health, Looks, Fame, Acting and Energy sit above the bottom bar. The bar has Career, Assets, People and Activities, plus a central **+1 month** button. "Just a week", "Skip 3 months" and "Skip a year" are on the life screen.
+
+**Popups that pop up.** Offers, audition invitations, random events, illnesses, births, deaths and award invitations appear as bottom-sheet popups that pause time. You can accept an offer or audition straight from the popup, and every choice shows its outcome. A skip resumes automatically after you answer.
+
+**Life simulation.**
+- Happiness and Looks join Health. Happiness drifts with your partner, home, pets, debt, health and fame. Looks fade slowly with age and slightly affect casting.
+- Health conditions, from colds and sprains to burnout, heart disease and cancer, can be treated by a doctor at era-adjusted cost.
+- More than 30 random events, gated by age, fame, era and what you own: school plays, bullies, stray cats, paparazzi, tabloids, brand deals, burglaries, investment tips, tax audits, dangerous stunts, proposals, anniversaries and more. Events do not repeat within a year.
+- An Activities menu: gym, running, meditation, reading, doctor, therapy, spa, cosmetic surgery, acting class, improv, community theatre, voice coaching, social media, charity, clubbing, concerts, solo holidays, the lottery and adoption.
+- A bigger shop: eight homes from a studio flat to a private island, eight vehicles from a bicycle to a supercar, plus luxuries, collectibles and pets. Homes and collectibles appreciate; vehicles depreciate. Owning a home cuts your living costs by almost two thirds.
+- Deeper relationships: gifts, compliments, family time, arguments, asking family for money, trying for a baby with an adult partner you live with, pregnancies and births, and divorce settlements. Romance rules are unchanged: anything beyond close-age teenage dating stays adult-only.
+- New lives share a family surname.
+
+**Health, death and legacy (planned v1.7).** The old once-a-year death roll is replaced by weekly health-aware mortality. Parents, partners and relatives age and die too, sometimes leaving an inheritance. When you die you get an obituary, a BitLife-style ribbon (Screen icon, Acclaimed, Mogul, Workhorse, Family first, Devoted, Off screen, Gone too soon, Working actor) and a legacy score. You can then continue as one of your children, who inherits your money (after 20% estate tax), homes, cars and pets. Legacy (in the menu) lists every past life in the family.
+
+**Spin-offs and revivals (planned v1.6).** Beloved TV characters (fans 68+) can get their own spin-off series or film, built from the original cast. Shows that ended six or more years ago can come back as a revival in the same series. Hit films from ten or more years ago can earn a legacy sequel. Strong recurring film characters can get standalone films. All of these are explicitly fictional productions with real casting and filming dates starting from the day of the offer. A spun-off series continues season by season within its own era.
+
+**Cheats** now also include max happiness, health and looks, cure everything, cash and fame boosts and an energy refill.
+
+Saves from version 1.5 migrate in place: new stats are created on first load and nothing earned is lost.
 
 ## Version 1.5 · Life and career overhaul
 

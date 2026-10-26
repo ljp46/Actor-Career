@@ -1,7 +1,7 @@
-import {active,currentDate,roleFit,projectPhase,projectSchedule,castFor,filmingProjects,train,lifestyle,normaliseGender} from './engine.js?v=15';
-import {careerProfile,prepareAudition,preparation,offerConflict,pendingOffers,onSetAction} from './career.js?v=15';
-import {featuredOpportunities,applyRole,forceRole,submitAudition,buyAsset,sellAsset,guestEligible,resolveLifeEvent,socialProfile} from './overhaul.js?v=15';
-import {ensureOverhaul,roleAssessment,knownFor,castingReason,assets,eraValue,lifestyles,monthlyCosts,openLifeEvent,calendarReason,plusDays} from './game-rules.js?v=15';
+import {active,currentDate,roleFit,projectPhase,projectSchedule,castFor,filmingProjects,train,lifestyle,normaliseGender} from './engine.js?v=16';
+import {careerProfile,prepareAudition,preparation,offerConflict,pendingOffers,onSetAction} from './career.js?v=16';
+import {featuredOpportunities,applyRole,forceRole,submitAudition,buyAsset,sellAsset,guestEligible,resolveLifeEvent,socialProfile} from './overhaul.js?v=16';
+import {ensureOverhaul,roleAssessment,knownFor,castingReason,assets,eraValue,lifestyles,monthlyCosts,openLifeEvent,calendarReason,plusDays} from './game-rules.js?v=16';
 let worldQuery='',worldPhase='',worldPage=0,selected=null,rolePage=0;
 const currentApps=s=>s.applications.filter(a=>a.personId===s.activeId&&!['rejected','expired','withdrawn','accepted','declined'].includes(a.status));
 const find=(s,c,id)=>[...c,...s.projects].find(p=>p.id===id);

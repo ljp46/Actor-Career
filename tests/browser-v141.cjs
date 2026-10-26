@@ -11,15 +11,15 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes('/filmographies/years/'))requests.push(r.url())});
  await page.goto('http://127.0.0.1:8765');await page.locator('#name').waitFor();
  await page.evaluate(async p=>{
-  const e=await import('./engine.js?v=15'),r=p.roles.find(r=>r.personId===974169),t=e.projectSchedule(p);
+  const e=await import('./engine.js?v=16'),r=p.roles.find(r=>r.personId===974169),t=e.projectSchedule(p);
   const s=e.createCareer({name:'Filmography Test',birthday:`${r.birthYear}-01-01`,startDate:t.castingStart,gender:r.gender},[]);
   s.skills.acting=100;localStorage.setItem(e.SAVE_KEY,JSON.stringify(s));
  },project);
- await page.reload();await page.locator('[data-advance="1"]').waitFor({timeout:120000});
+ await page.reload();await page.locator('#ageButton').waitFor({timeout:120000});
  assert.ok(await page.locator('[data-opportunity]').count()<=5,'Daily shortlist stays bounded');
- await page.locator('[data-tab="world"]').click();await page.locator('#worldSearch').fill('Stuck in the Middle');
+ await page.locator('[data-tab="career"]').click();assert.ok(await page.locator('[data-opportunity]').count()<=5);await page.locator('[data-seg="world"]').click();await page.locator('#worldSearch').fill('Stuck in the Middle');
  assert.ok((await page.locator('#screen').innerText()).includes('Season 1'));
  assert.ok(!requests.some(u=>u.includes('/1990.json.gz')),'Only nearby overlay years load');
- await page.locator('#settingsButton').click();assert.ok((await page.locator('.modal').innerText()).includes('Version 1.5'));
+ await page.locator('#settingsButton').click();assert.ok((await page.locator('.modal').innerText()).includes('Version 1.7'));
  assert.deepEqual(errors,[]);console.log('v1.4.1 browser passed: permanent Disney cast, auditions, World, saved-game reload and bounded year loading.');await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});

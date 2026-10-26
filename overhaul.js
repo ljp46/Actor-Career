@@ -1,7 +1,8 @@
-import {active,available,currentDate,projectSchedule,roleFit,projectPhase,ensurePerson,person,uniqueName,castFor,rand} from './engine.js?v=15';
-import {ensureCareer,careerProfile,pendingOffers,makeOffer,startAudition,attendCallback,offerConflict,resolveProductionEvent,prepareAudition} from './career.js?v=15';
-import {bond,personality,personAge,romanceAllowed,interact} from './relationships.js?v=15';
-import {ensureOverhaul,roleAssessment,projectReach,typecastPressure,knownFor,dateOf,plusDays,daysBetween,limit,fingerprint,feed,queueEvent,openLifeEvent,castingReason,syncCalendar,reserve,calendarReason,economyTick,assets,eraValue,lifestyles,monthlyCosts,characterIdentity} from './game-rules.js?v=15';
+import {active,available,currentDate,projectSchedule,roleFit,projectPhase,ensurePerson,person,uniqueName,castFor,rand} from './engine.js?v=16';
+import {ensureCareer,careerProfile,pendingOffers,makeOffer,startAudition,attendCallback,offerConflict,resolveProductionEvent,prepareAudition,acceptCareerOffer,declineCareerOffer} from './career.js?v=16';
+import {resolveLifeChoice,continueAs} from './life.js?v=16';
+import {bond,personality,personAge,romanceAllowed,interact} from './relationships.js?v=16';
+import {ensureOverhaul,roleAssessment,projectReach,typecastPressure,knownFor,dateOf,plusDays,daysBetween,limit,fingerprint,feed,queueEvent,openLifeEvent,castingReason,syncCalendar,reserve,calendarReason,economyTick,assets,eraValue,lifestyles,monthlyCosts,characterIdentity,assetValue} from './game-rules.js?v=16';
 
 const all=(s,c)=>[...new Map([...c,...s.projects].map(p=>[p.id,p])).values()];
 const production=(s,c,id)=>all(s,c).find(p=>p.id===id);
@@ -47,9 +48,9 @@ export function applicationTick(s,catalogue){
    queueEvent(s,'casting',a.status==='considering'?'Casting has opened':'Your watched role is unavailable',`${p.title} · ${a.character}. ${a.status==='considering'?'Your registered interest is now an application.':'The part is taken or its schedule no longer fits.'}`,[choice('ack','Continue')],{applicationId:a.id},`watch-${a.id}`);
   }
   if(a.status==='considering'&&date>=a.readyOn){
-   const score=roleFit(s,p,p.roles[a.index])*.28+s.skills.acting*.22+profile.reputation*.22+(profile.agent?.level||0)*4+s.fame*.12-typecastPressure(s,p,a.index);
+   const score=roleFit(s,p,p.roles[a.index])*.28+s.skills.acting*.22+profile.reputation*.22+(profile.agent?.level||0)*4+s.fame*.12+((s.lifeStats?.[s.activeId]?.looks??50)-50)*.06-typecastPressure(s,p,a.index);
    if(!eligible.has(`${p.id}:${a.index}`)||rand(s)>limit(score/100,.12,.9)){a.status='rejected';feed(s,'Application decision',`${p.title} is not inviting you to audition for ${a.character}.`)}
-   else{a.status='invited';queueEvent(s,'casting','An audition invitation',`${p.title} wants to see your audition for ${a.character}. Prepare and submit it through your application.`,[choice('ack','Review my application')],{applicationId:a.id},`invited-${a.id}`)}
+   else{a.status='invited';queueEvent(s,'casting','An audition invitation',`${p.title} wants to see you for ${a.character}. Audition now, or prepare first from Career.`,[choice('submit','Audition now'),choice('ack','Prepare first')],{applicationId:a.id},`invited-${a.id}`)}
   }
   if(a.status==='callback'){
    const callback=s.careerAuditions.find(x=>x.id===a.callbackId);
@@ -179,7 +180,17 @@ export function resolveLifeEvent(s,catalogue,id,answer,{guestId=null}={}){
  else if(e.type==='rivalry'&&p){if(answer==='private'){p.rivalry=limit((p.rivalry||0)-8);r.respect=limit(r.respect+4)}else if(answer==='public'){p.rivalry=limit((p.rivalry||0)+10);profile.publicImage=limit(profile.publicImage-5)}else r.tension=limit(r.tension+2)}
  else if(e.type==='recast'){if(answer==='pursue'){s.recastOpportunities[`${e.data.projectId}:${e.data.index}`]=e.data.expiresOn;feed(s,'An explicit recasting opportunity',`${e.data.title} is now accepting applications for this established character.`)}}
  else if(e.type==='budget'&&answer==='reduce'){profile.lifestyle='family';feed(s,'Reducing commitments','You return to shared living while reviewing the upkeep of your possessions. Selling an asset can reduce ongoing costs.')}
- e.status='resolved';e.answer=answer;e.resolvedOn=date;profile.lastChoice=date;feed(s,e.title,`You chose: ${e.options.find(o=>o.id===answer).label}.`);
+ else if(e.type==='offer'){
+  const offer=pendingOffers(s).find(o=>o.id===e.data.offerId);
+  if(!offer)e.outcome='That offer is no longer available.';
+  else if(answer==='accept'){acceptCareerOffer(s,catalogue,offer.id,{collections:{},projectCollections:{}});e.outcome=`You are playing ${offer.character} in ${offer.title}.`}
+  else if(answer==='decline'){declineCareerOffer(s,offer.id);e.outcome='You turn it down.'}
+  else e.outcome='The offer is waiting in Career until '+offer.expiresOn+'.';
+ }
+ else if(e.type==='casting'&&answer==='submit'){const out=submitAudition(s,catalogue,e.data.applicationId);e.outcome=out.stage==='offer'?'They loved it. An offer is on its way.':out.stage==='callback'?'You got a callback. The final decision comes soon.':'It did not go your way this time.'}
+ else if(e.type==='legacy'){if(answer.startsWith('heir:')){continueAs(s,answer.slice(5));e.outcome='The story continues.'}else{s.awaitingHeir=false;e.outcome='This life is complete.'}}
+ else if(['life','health','family'].includes(e.type)){e.outcome=resolveLifeChoice(s,catalogue,e,answer)}
+ e.status='resolved';e.answer=answer;e.resolvedOn=date;profile.lastChoice=date;feed(s,e.title,e.outcome||`You chose: ${e.options.find(o=>o.id===answer).label}.`);return e.outcome||'';
 }
 export function nextScheduledDate(s,end){return s.commitments.filter(c=>c.personId===s.activeId&&c.status==='scheduled'&&c.start>currentDate(s)&&c.start<=end).map(c=>c.start).sort()[0]||end}
 function ceremoniesTick(s){
@@ -258,4 +269,4 @@ export function overhaulTick(s,catalogue){
  s.publicSightings=s.publicSightings.filter(e=>daysBetween(e.date,currentDate(s))<120).slice(-80);s.commitments=s.commitments.filter(c=>c.status==='scheduled'||daysBetween(c.end,currentDate(s))<90);
 }
 export function buyAsset(s,id){const a=assets.find(a=>a.id===id);if(!a||personAge(s,active(s))<a.minAge||s.year<(a.minYear||1960))throw Error('This purchase is unavailable.');const price=Math.round(a.price*eraValue(s.year));if(s.money<price)throw Error('You do not have enough money.');if(s.possessions.some(p=>p.id===id&&p.ownerId===s.activeId))throw Error('You already own this asset.');s.money-=price;s.possessions.push({id:a.id,name:a.name,year:s.year,ownerId:s.activeId,paid:price});feed(s,'A purchase',`${a.name}: $${price.toLocaleString()}. Its upkeep is included in your living costs.`)}
-export function sellAsset(s,id){const index=s.possessions.findIndex(p=>p.id===id&&p.ownerId===s.activeId);if(index<0)throw Error('You do not own this asset.');const owned=s.possessions[index],a=assets.find(a=>a.id===id);const value=Math.round((owned.paid||a?.price*eraValue(owned.year)||0)*(a?.kind==='home'?Math.min(1.8,1+Math.max(0,s.year-owned.year)*.025):Math.max(.2,.8-Math.max(0,s.year-owned.year)*.04)));s.money+=value;s.possessions.splice(index,1);feed(s,'An asset sold',`${owned.name}: $${value.toLocaleString()}. Its ongoing costs stop.`)}
+export function sellAsset(s,id){const index=s.possessions.findIndex(p=>p.id===id&&p.ownerId===s.activeId);if(index<0)throw Error('You do not own this asset.');const owned=s.possessions[index],value=assetValue(s,owned);s.money+=value;s.possessions.splice(index,1);feed(s,'An asset sold',`${owned.name}: $${value.toLocaleString()}. Its ongoing costs stop.`);return value}
