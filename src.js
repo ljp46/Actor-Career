@@ -9,6 +9,8 @@ import {ensureOverhaul,openLifeEvent,plusDays,daysBetween,syncCalendar,calendarR
 import {ensureLife,weeklyLife,conditionsOf} from './life.js?v=17';
 import {spinoffTick} from './spinoffs.js?v=17';
 import {viceTick} from './vice.js?v=17';
+import {exTick} from './exes.js?v=17';
+import {filmingProjects,castFor} from './engine.js?v=17';
 import {renderTopbar,renderDock,renderLife,renderCareer,setCareerSeg,renderAssets,renderActivities,renderLegacy,attentionCount} from './ui-life.js?v=17';
 const $=s=>document.querySelector(s),screen=$('#screen'),nav=$('#nav');let catalogue=[],state=null,tab='life',yearIndex=new Set(),loadedYears=new Set(),opportunityIndex={},dbMeta={},worldQuery='',worldPage=0,auditionQuery='',auditionKind='',auditionPageNumber=0;
 let franchiseData={collections:{},projectCollections:{},ratings:{}};
@@ -124,8 +126,8 @@ function showResult(title,body,icon='',after=null){
  document.body.append(e);const close=()=>{e.remove();if(after)after();else render()};
  e.querySelector('[data-ok]').onclick=close;e.addEventListener('click',x=>{if(x.target===e)close()});e.querySelector('[data-ok]').focus();
 }
-const eventIcon={crime:'🚨',affair:'💔',casting:'🎬',offer:'📜',release:'🎞️','award-invitation':'🏆','award-result':'🏆',work:'🎥',publicity:'📺',rumour:'📰',relationship:'💞',friendship:'🤝',rivalry:'⚔️',recast:'🔁',budget:'💸',life:'✨',health:'🩺',family:'👪',legacy:'🕯️'};
-const eventKicker={crime:'Crime',affair:'Love life',casting:'Casting',offer:'An offer',release:'Release',  'award-invitation':'Awards','award-result':'Awards',work:'On set',publicity:'Publicity',rumour:'Gossip',relationship:'Love life',friendship:'Friends',rivalry:'Rivalry',recast:'Casting',budget:'Money',life:'Life',health:'Health',family:'Family',legacy:'The end'};
+const eventIcon={ex:'💌',crime:'🚨',affair:'💔',casting:'🎬',offer:'📜',release:'🎞️','award-invitation':'🏆','award-result':'🏆',work:'🎥',publicity:'📺',rumour:'📰',relationship:'💞',friendship:'🤝',rivalry:'⚔️',recast:'🔁',budget:'💸',life:'✨',health:'🩺',family:'👪',legacy:'🕯️'};
+const eventKicker={ex:'Your ex',crime:'Crime',affair:'Love life',casting:'Casting',offer:'An offer',release:'Release',  'award-invitation':'Awards','award-result':'Awards',work:'On set',publicity:'Publicity',rumour:'Gossip',relationship:'Love life',friendship:'Friends',rivalry:'Rivalry',recast:'Casting',budget:'Money',life:'Life',health:'Health',family:'Family',legacy:'The end'};
 function presentEventSheet(){
  const s=state,e=s&&openLifeEvent(s),existing=document.querySelector('.life-event-modal');
  if(document.querySelector('.result-modal'))return;
@@ -178,7 +180,7 @@ function cheats(){
  m.querySelectorAll('[data-cheat]').forEach(b=>b.onclick=()=>{const target=m.querySelector('#cheatPerson').value,names=target==='__castmates__'?castmates:contacts.filter(p=>p.id===target).map(p=>p.name);try{const changed=applyCheat(state,b.dataset.cheat,names);save();render();m.querySelector('#cheatResult').textContent=['acting','drama','comedy'].includes(b.dataset.cheat)?`${b.dataset.cheat} is now 100.`:changed?`Updated ${changed} ${changed===1?'relationship':'relationships'}${b.dataset.cheat==='chemistry'?' · romantic chemistry is now 100':''}.`:b.dataset.cheat==='chemistry'?'No eligible matches selected. Chemistry needs two adults, or close-age teenagers, and never relatives.':'Nobody eligible was selected.'}catch(e){toast(e.message)}});
 }
 function openMenu(){
- const m=modal(`<h2>Second Take</h2><p class="muted">Version 1.8 · your save lives on this device. Export it now and then as a backup.</p><div class="sheet-actions"><button class="secondary" id="openLegacy">Family legacy</button><button class="secondary" id="openCheats">Cheats</button><button class="secondary" id="exportSave">Export save</button><label for="importSave" style="margin:4px 0 0">Import a save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="danger" id="resetSave">Start a new life</button></div><p class="muted" style="margin-top:14px">${esc(databaseStatus())} Changed castings, relationships and events are fictional. An independent fan project, not affiliated with any studio. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`);
+ const m=modal(`<h2>Second Take</h2><p class="muted">Version 1.9 · your save lives on this device. Export it now and then as a backup.</p><div class="sheet-actions"><button class="secondary" id="openLegacy">Family legacy</button><button class="secondary" id="openCheats">Cheats</button><button class="secondary" id="exportSave">Export save</button><label for="importSave" style="margin:4px 0 0">Import a save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="danger" id="resetSave">Start a new life</button></div><p class="muted" style="margin-top:14px">${esc(databaseStatus())} Changed castings, relationships and events are fictional. An independent fan project, not affiliated with any studio. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`);
  m.querySelector('#openLegacy').onclick=()=>{m.remove();navigate('legacy')};
  m.querySelector('#openCheats').onclick=()=>{m.remove();cheats()};
  m.querySelector('#exportSave').onclick=()=>{if(!state)return toast('Start a life first.');const url=URL.createObjectURL(new Blob([JSON.stringify(state)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=`second-take-${state.year}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)};
@@ -205,7 +207,7 @@ async function advanceWeeks(count,{resume=false}={}){
    advance(state,catalogue,{days});careerTick(state,catalogue,franchiseData);
    continuityTick(state,catalogue,{shows:seasonShows,franchises:franchiseData,overrides:continuityOverrides});
    overhaulTick(state,catalogue);
-   if(!state.complete){spinoffTick(state,catalogue);weeklyLife(state,catalogue,days);if(!state.complete)viceTick(state,catalogue,days)}
+   if(!state.complete){spinoffTick(state,catalogue);weeklyLife(state,catalogue,days);if(!state.complete)viceTick(state,catalogue,days);if(!state.complete)exTick(state,catalogue,days,{workingNames:filmingProjects(state,catalogue).flatMap(p=>p.roles.map((r,i)=>castFor(state,p,i)))})}
    remaining-=days;
    if(state.continuityRequests.some(r=>![...catalogue,...state.projects].some(p=>p.id===r.projectId)&&r.year<=state.year+2))await loadCareerYears(state);
    if(openLifeEvent(state)){state.advanceRemaining=Math.max(0,remaining);break}

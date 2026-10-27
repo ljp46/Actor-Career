@@ -20,6 +20,6 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  await page.locator('[data-tab="career"]').click();assert.ok(await page.locator('[data-opportunity]').count()<=5);await page.locator('[data-seg="world"]').click();await page.locator('#worldSearch').fill('Stuck in the Middle');
  assert.ok((await page.locator('#screen').innerText()).includes('Season 1'));
  assert.ok(!requests.some(u=>u.includes('/1990.json.gz')),'Only nearby overlay years load');
- await page.locator('#settingsButton').click();assert.ok((await page.locator('.modal').innerText()).includes('Version 1.8'));
+ await page.locator('#settingsButton').click();assert.ok((await page.locator('.modal').innerText()).includes('Version 1.9'));
  assert.deepEqual(errors,[]);console.log('v1.4.1 browser passed: permanent Disney cast, auditions, World, saved-game reload and bounded year loading.');await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});

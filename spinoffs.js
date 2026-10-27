@@ -1,7 +1,8 @@
 // v1.6 spin-offs, revivals and legacy sequels. Every production created here is
 // an explicitly fictional, alternate-timeline project owned by this save.
 import {active,currentDate,uniqueName} from './engine.js?v=17';
-import {characterKey,makeOffer,careerProfile} from './career.js?v=17';
+import {characterKey,makeOffer,careerProfile,reservations} from './career.js?v=17';
+import {projectSchedule} from './engine.js?v=17';
 import {personAge} from './relationships.js?v=17';
 import {plusDays,daysBetween,random,ensureOverhaul,offeredFee} from './game-rules.js?v=17';
 
@@ -12,8 +13,27 @@ const generic=key=>!key||/^(self|himself|herself|uncredited|voice|man|woman|guar
 export function ensureSpinoffs(s){s.spinoffs??={history:[],lastCheck:null};return s.spinoffs}
 
 // A fictional production with honest, dated filming windows starting from today.
-export function createContinuation(s,{parent,character,kind,label,source,weeksToFilming=8,filmingWeeks,episodes=10,seriesId=null,seasonNumber=1,titleOverride=null}){
- const today=currentDate(s),actor=active(s),castingStart=today,filmStart=plusDays(today,weeksToFilming*7),filmEnd=plusDays(filmStart,(filmingWeeks||(kind==='TV series'?16:12))*7),release=plusDays(filmEnd,kind==='TV series'?90:150),year=Number(release.slice(0,4));
+// Everything the player is already committed to, plus a projected next season for every show
+// they are still on (a year after the last one), so new productions never land on top of them.
+export function busyWindows(s,catalogue=[]){
+ const out=[],today=currentDate(s),push=(start,end,title)=>{if(start&&end&&end>today)out.push({start,end,title})};
+ const byId=new Map(all(s,catalogue).map(p=>[p.id,p]));
+ for(const f of s.filmography.filter(f=>f.personId===s.activeId&&!['released','withdrawn'].includes(f.status))){const p=byId.get(f.projectId);if(p){const t=projectSchedule(p);push(t.filmingStart,t.filmingEnd,p.title)}}
+ for(const c of (s.commitments||[]).filter(c=>c.personId===s.activeId&&c.status==='scheduled'))push(c.start,c.end,c.title);
+ for(const r of reservations(s))push(r.schedule.filmingStart,r.schedule.filmingEnd,r.entry.project.title);
+ for(const c of (s.tvCareers||[]).filter(c=>c.personId===s.activeId&&c.status==='active')){
+  if(c.next){const t=projectSchedule(c.next);push(t.filmingStart,t.filmingEnd,c.title)}
+  const last=byId.get(c.lastProjectId);if(last){const t=projectSchedule(last);for(const years of [1,2])push(plusDays(t.filmingStart,365*years),plusDays(t.filmingEnd,365*years),`${c.title} (expected)`)}
+ }
+ return out;
+}
+export function freeStart(s,catalogue,earliest,days,buffer=21){
+ const busy=busyWindows(s,catalogue);let start=earliest;
+ for(let i=0;i<40;i++){const end=plusDays(start,days),clash=busy.find(b=>plusDays(start,-buffer)<b.end&&b.start<plusDays(end,buffer));if(!clash)return start;start=plusDays(clash.end,buffer)}
+ return start;
+}
+export function createContinuation(s,{parent,character,kind,label,source,weeksToFilming=8,filmingWeeks,episodes=10,seriesId=null,seasonNumber=1,titleOverride=null,catalogue=[]}){
+ const shootDays=(filmingWeeks||(kind==='TV series'?16:12))*7,today=currentDate(s),actor=active(s),castingStart=today,filmStart=freeStart(s,catalogue,plusDays(today,weeksToFilming*7),shootDays),filmEnd=plusDays(filmStart,shootDays),release=plusDays(filmEnd,kind==='TV series'?90:150),year=Number(release.slice(0,4));
  const age=personAge(s,actor),parentYear=parent?.year||year-1,gap=year-parentYear;
  const lead={character,actor:actor.name,gender:actor.gender,birthYear:actor.birthYear,characterAge:age,ageMin:Math.max(4,age-8),ageMax:age+8,roleType:kind==='TV series'?'main':undefined,episodeCount:kind==='TV series'?episodes:undefined};
  const support=(parent?.roles||[]).filter(r=>characterKey(r.character)!==characterKey(character)&&!generic(characterKey(r.character))).slice(0,6).map(r=>({...r,characterAge:r.characterAge==null?undefined:r.characterAge+gap,ageMin:Math.max(4,(r.ageMin||18)+gap),ageMax:(r.ageMax||60)+gap,roleType:kind==='TV series'?'recurring':r.roleType,episodeCount:kind==='TV series'?Math.max(2,Math.round(episodes*.6)):undefined}));
@@ -26,7 +46,7 @@ export function createContinuation(s,{parent,character,kind,label,source,weeksTo
 
 function offerContinuation(s,p,source,{premium=1.4}={}){
  const fee=Math.round(offeredFee(s,p,0)*premium);
- const offer=makeOffer(s,p,0,{source,fee,expiresOn:plusDays(currentDate(s),35)});
+ const offer=makeOffer(s,p,0,{source,fee,expiresOn:[plusDays(currentDate(s),35),plusDays(projectSchedule(p).filmingStart,-7)].sort()[0]});
  ensureSpinoffs(s).history.push({date:currentDate(s),type:source,projectId:p.id,title:p.title,character:p.roles[0].character,offerId:offer.id});
  return offer;
 }
@@ -53,24 +73,24 @@ export function launchSpinoff(s,catalogue,career){
  const parent=find(s,catalogue,career.lastProjectId)||{title:career.title,roles:[],year:s.year-1};
  const kind=random(s)<.8?'TV series':'Film';
  const name=String(career.character).replace(/\s*\(.*?\)\s*/g,'').trim();
- const p=createContinuation(s,{parent,character:career.character,kind,source:'spinoff',label:kind==='TV series'?`${name}`:`${name}: The Movie`});
+ const p=createContinuation(s,{catalogue,parent,character:career.character,kind,source:'spinoff',label:kind==='TV series'?`${name}`:`${name}: The Movie`});
  return offerContinuation(s,p,'spinoff',{premium:1.6});
 }
 export function launchRevival(s,catalogue,career){
  const parent=find(s,catalogue,career.lastProjectId)||{title:career.title,roles:[],year:s.year-8};
- const p=createContinuation(s,{parent,character:career.character,kind:'TV series',source:'revival',label:`${career.title} · Revival`,seriesId:career.seriesId,seasonNumber:(career.lastSeason||1)+1,episodes:8});
+ const p=createContinuation(s,{catalogue,parent,character:career.character,kind:'TV series',source:'revival',label:`${career.title} · Revival`,seriesId:career.seriesId,seasonNumber:(career.lastSeason||1)+1,episodes:8});
  const offer=offerContinuation(s,p,'revival',{premium:1.5});ensureSpinoffs(s).history.at(-1).seriesId=career.seriesId;return offer;
 }
 export function launchLegacySequel(s,catalogue,credit){
  const parent=find(s,catalogue,credit.projectId)||{title:credit.title,roles:[],year:credit.year,genre:credit.genre};
- const p=createContinuation(s,{parent,character:credit.role,kind:'Film',source:'legacy-sequel',label:`${credit.title}: Legacy`,filmingWeeks:14});
+ const p=createContinuation(s,{catalogue,parent,character:credit.role,kind:'Film',source:'legacy-sequel',label:`${credit.title}: Legacy`,filmingWeeks:14});
  if(parent.collectionId)p.collectionId=parent.collectionId;
  return offerContinuation(s,p,'legacy-sequel',{premium:1.8});
 }
 export function launchFilmSpinoff(s,catalogue,identity){
  const name=String(identity.character).replace(/\s*\(.*?\)\s*/g,'').trim();
  const parent=all(s,catalogue).find(p=>p.roles.some(r=>r.character===identity.character)&&s.filmography.some(f=>f.personId===s.activeId&&f.projectId===p.id))||null;
- const p=createContinuation(s,{parent,character:identity.character,kind:'Film',source:'spinoff',label:`${name}`});
+ const p=createContinuation(s,{catalogue,parent,character:identity.character,kind:'Film',source:'spinoff',label:`${name}`});
  return offerContinuation(s,p,'spinoff',{premium:1.6});
 }
 

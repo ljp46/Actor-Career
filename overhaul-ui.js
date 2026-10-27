@@ -1,5 +1,5 @@
 import {active,currentDate,roleFit,projectPhase,projectSchedule,castFor,filmingProjects,train,lifestyle,normaliseGender} from './engine.js?v=17';
-import {careerProfile,prepareAudition,preparation,offerConflict,pendingOffers,onSetAction} from './career.js?v=17';
+import {careerProfile,prepareAudition,preparation,offerConflict,pendingOffers,onSetAction,conflictDetails,conflictText} from './career.js?v=17';
 import {featuredOpportunities,applyRole,forceRole,submitAudition,buyAsset,sellAsset,guestEligible,resolveLifeEvent,socialProfile} from './overhaul.js?v=17';
 import {ensureOverhaul,roleAssessment,knownFor,castingReason,assets,eraValue,lifestyles,monthlyCosts,openLifeEvent,calendarReason,plusDays} from './game-rules.js?v=17';
 let worldQuery='',worldPhase='',worldPage=0,selected=null,rolePage=0;
@@ -36,7 +36,7 @@ export function renderToday(root,u){
  root.querySelectorAll('[data-buy-asset]').forEach(b=>b.onclick=()=>u.action(()=>buyAsset(s,b.dataset.buyAsset)));
  root.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>u.action(()=>sellAsset(s,b.dataset.sell)));
 }
-function reasonFor(s,c,p,index){const fit=roleFit(s,p,p.roles[index]),phase=projectPhase(s,p),key=`${p.id}:${index}`;return castingReason(s,p,index)||(fit<=50?'Applications require more than 50% fit.':'')||(s.casts[key]||s.choices.includes(key)?'This role has been decided.':'')||(s.filmography.some(f=>f.projectId===p.id&&f.personId===s.activeId&&f.status!=='withdrawn')?'You already have a role in this production.':'')||(offerConflict(s,c,p)?'Filming conflicts with an accepted commitment.':'')||(!['Announced','Casting'].includes(phase)?'This production is no longer taking applications.':'')}
+function reasonFor(s,c,p,index){const fit=roleFit(s,p,p.roles[index]),phase=projectPhase(s,p),key=`${p.id}:${index}`;return castingReason(s,p,index)||(fit<=50?'Applications require more than 50% fit.':'')||(s.casts[key]||s.choices.includes(key)?'This role has been decided.':'')||(s.filmography.some(f=>f.projectId===p.id&&f.personId===s.activeId&&f.status!=='withdrawn')?'You already have a role in this production.':'')||(offerConflict(s,c,p)?conflictText(conflictDetails(s,c,p)):'')||(!['Announced','Casting'].includes(phase)?'This production is no longer taking applications.':'')}
 export function renderWorld(root,u){
  const {state:s,catalogue:c,esc,fmtDate}=u,q=worldQuery.toLowerCase(),all=[...new Map([...c,...s.projects].map(p=>[p.id,p])).values()],filtered=all.filter(p=>(!worldPhase||projectPhase(s,p)===worldPhase)&&(!q||[p.title,p.director,p.genre,...p.roles.flatMap(r=>[r.actor,r.character])].some(v=>String(v||'').toLowerCase().includes(q)))).sort((a,b)=>Math.abs(a.year-s.year)-Math.abs(b.year-s.year)||a.title.localeCompare(b.title)),pages=Math.max(1,Math.ceil(filtered.length/16));worldPage=Math.min(worldPage,pages-1);
  const focused=all.find(p=>p.id===selected),roleMatches=focused?focused.roles.map((r,i)=>({r,i})).filter(({r})=>!q||focused.title.toLowerCase().includes(q)||[r.actor,r.character].some(v=>String(v||'').toLowerCase().includes(q))):[];

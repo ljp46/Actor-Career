@@ -2,6 +2,14 @@
 
 A mobile-first alternate-history actor life sim. Choose a birthday and starting date, audition inside a living film/TV world, change casting history, build a family and relationships, spend your earnings, and live until the very end.
 
+## Version 1.9 · Exes and schedules
+
+**Exes have history now.** Every breakup records who ended it and why: cheating, too much tension, a prison sentence, leaving for someone else, and so on. An ex only asks you back after time has passed, when feelings linger and closure is low, and less often each time you have split. The popup tells you the history ("Jenna ended it, too much tension, Nov 2020"). You can get back together, ask what has changed (their answer hints whether they mean it, and insincere reunions start with more tension), offer friendship, close the door for good, or, if they dumped you, say yes and then dump them. Exes also move on and post the photos, give unflattering interviews when either of you is famous, ask to meet for closure, and turn up in your cast. An ex's profile shows your history, closure and lingering feelings, with options to meet for closure, text them at 2am or block their number. People has an Exes filter, and exes no longer get the generic "they make the first move" popup.
+
+**Clashes are explained.** Offers, offer popups, World role pages and error messages now say exactly what clashes, with dates, for example "Clashes with Night Shift (1 May 2021 – 1 Aug 2021)". Career › My work has a **Your schedule** list of booked shoots, commitments and your shows' expected next seasons, with overlaps flagged.
+
+**Spin-offs fit around your show.** Spin-offs, revivals and legacy sequels are scheduled clear of everything you have booked, and of the expected next two seasons of any show you are still on. If a real returning season still lands on top of a spin-off that has not started filming, your show takes priority: you can accept the season, and the spin-off moves its shoot to start after the season wraps.
+
 ## Version 1.8 · Affairs and crime
 
 **Love life without the rules.** Adults can flirt with, secretly date or spend a private night with someone who is already taken. Their partner stays in the picture until something changes. On a taken person's profile, **Break them up** lets you ask them to leave their partner for you, or meddle in their relationship to split them up. Both can backfire.

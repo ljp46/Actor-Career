@@ -7,6 +7,7 @@ import {ensureOverhaul,roleAssessment,knownFor,assets,eraValue,lifestyles,monthl
 import {auditionPage} from './catalogue.js?v=17';
 import {lifeStats,ensureLife,activities,activityReason,activityCost,doActivity,conditionsOf,conditionTypes,treat,petTypes,adoptPet,lifeSummary,ageOf} from './life.js?v=17';
 import {renderWorld,awardsMarkup} from './overhaul-ui.js?v=17';
+import {busyWindows} from './spinoffs.js?v=17';
 import {personAge} from './relationships.js?v=17';
 import {crimes,crimeReason,commitCrime,inPrison,prisonActivities,prisonReason,prisonActivity,viceStatus,criminalRecord} from './vice.js?v=17';
 
@@ -120,10 +121,16 @@ function renderAuditions(root,u){
  root.querySelector('#auditionKind').onchange=e=>{auditionKind=e.target.value;auditionPg=0;renderAuditions(root,u)};
  root.querySelector('#audPrev')?.addEventListener('click',()=>{auditionPg--;renderAuditions(root,u)});root.querySelector('#audNext')?.addEventListener('click',()=>{auditionPg++;renderAuditions(root,u)});
 }
+function scheduleMarkup(s,u){
+ const items=busyWindows(s,u.catalogue).sort((a,b)=>a.start.localeCompare(b.start));if(!items.length)return '';
+ const clash=i=>items.some((o,j)=>j!==i&&o.start<items[i].end&&items[i].start<o.end);
+ return `<div class="section-title">Your schedule</div><div class="list">${items.map((x,i)=>`<div class="list-row"><span class="emoji">${/expected/.test(x.title)?'🔮':'🎬'}</span><div class="main"><strong>${u.esc(x.title)}</strong><small>${u.esc(u.fmtDate(x.start))} – ${u.esc(u.fmtDate(x.end))}${/expected/.test(x.title)?' · estimated next season':''}</small>${clash(i)?'<span class="why" style="color:var(--danger)">Overlaps another commitment</span>':''}</div></div>`).join('')}</div><p class="muted" style="margin:0 2px 10px">New offers that land on these dates will tell you exactly what they clash with. Spin-offs are scheduled around your shows' expected seasons.</p>`;
+}
 function renderCredits(root,u){
  const s=u.state,a=active(s),credits=s.filmography.filter(f=>f.personId===a.id).sort((x,y)=>(y.year-x.year)||String(y.bookedOn||'').localeCompare(String(x.bookedOn||'')));
  const won=(s.awards||[]).filter(x=>x.personId===a.id&&x.status==='won'&&!x.productionAward).length;
  root.innerHTML=`<div class="money-grid"><div><span>Credits</span><b>${credits.length}</b></div><div><span>Released</span><b>${credits.filter(f=>!f.status||f.status==='released').length}</b></div><div><span>Awards won</span><b>${won}</b></div><div><span>Reputation</span><b>${Math.round(careerProfile(s).reputation)}</b></div></div>
+ ${scheduleMarkup(s,u)}
  ${awardsMarkup(s,{esc:u.esc,fmtDate:u.fmtDate})}
  <div class="list">${credits.map(f=>`<div class="list-row"><div class="main"><strong>${u.esc(f.title)}</strong><small>${f.year} · ${u.esc(f.kind==='TV series'?'TV':'Film')} · as ${u.esc(f.role)}</small>${f.outcome?`<small>${u.esc(f.outcome.result)} · critics ${f.outcome.critics} · audience ${f.outcome.audience}</small>`:''}</div><div class="side"><b>${u.esc(f.status==='released'||!f.status?'Released':f.status)}</b>${f.outcome?`${f.outcome.performance}/100`:''}</div></div>`).join('')||'<p class="empty">No credits yet. Your first role is out there.</p>'}</div>`;
 }
