@@ -43,7 +43,7 @@ test('normal career auditions still produce callbacks, rejections, offers and fi
 });
 test('competing offers stay non-binding, but accepting an overlapping shoot blocks another',()=>{
  const other={...first,id:'other'},c=[first,other],s=make(),a=forceOffer(s,first,c),b=forceOffer(s,other,c);assert.equal(pendingOffers(s).length,2);
- acceptCareerOffer(s,c,a.id,data);assert.throws(()=>acceptCareerOffer(s,c,b.id,data),/conflicts/);assert.equal(pendingOffers(s).find(o=>o.id===b.id).status,'offered');declineCareerOffer(s,b.id);assert.equal(careerProfile(s).reputation,60);
+ acceptCareerOffer(s,c,a.id,data);assert.throws(()=>acceptCareerOffer(s,c,b.id,data),new RegExp('Clashes with '+first.title));assert.equal(pendingOffers(s).find(o=>o.id===b.id).status,'offered');declineCareerOffer(s,b.id);assert.equal(careerProfile(s).reputation,60);
 });
 test('agents scout competing offers and agreed commission is paid at wrap even after leaving',()=>{
  const s=make(),other={...first,id:'other'},c=[first,other];hireAgent(s,1);applyCheat(s,'acting');assert.equal(searchAgentOffers(s,c),2);assert.throws(()=>searchAgentOffers(s,c),/already searched/);

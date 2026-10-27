@@ -1,8 +1,9 @@
 import {active,available,currentDate,projectSchedule,roleFit,projectPhase,ensurePerson,person,uniqueName,castFor,rand} from './engine.js?v=17';
-import {ensureCareer,careerProfile,pendingOffers,makeOffer,startAudition,attendCallback,offerConflict,resolveProductionEvent,prepareAudition,acceptCareerOffer,declineCareerOffer} from './career.js?v=17';
+import {ensureCareer,careerProfile,pendingOffers,makeOffer,startAudition,attendCallback,offerConflict,resolveProductionEvent,prepareAudition,acceptCareerOffer,declineCareerOffer,conflictDetails,conflictText} from './career.js?v=17';
 import {resolveLifeChoice,continueAs} from './life.js?v=17';
 import {inPrison,noteCheating,resolveVice,recordPenalty,exclusivePartners,isTaken} from './vice.js?v=17';
-import {bond,personality,personAge,romanceAllowed,interact} from './relationships.js?v=17';
+import {bond,personality,personAge,romanceAllowed,interact,recordBreakup} from './relationships.js?v=17';
+import {resolveEx} from './exes.js?v=17';
 import {ensureOverhaul,roleAssessment,projectReach,typecastPressure,knownFor,dateOf,plusDays,daysBetween,limit,fingerprint,feed,queueEvent,openLifeEvent,castingReason,syncCalendar,reserve,calendarReason,economyTick,assets,eraValue,lifestyles,monthlyCosts,characterIdentity,assetValue} from './game-rules.js?v=17';
 
 const all=(s,c)=>[...new Map([...c,...s.projects].map(p=>[p.id,p])).values()];
@@ -25,7 +26,7 @@ export function applyRole(s,catalogue,p,index,{watch=false}={}){
  if(roleFit(s,p,p.roles[index])<=50)throw Error('Applications require more than 50% fit.');
  const taken=castingReason(s,p,index);if(taken)throw Error(taken);
  const phase=projectPhase(s,p);if(watch&&phase!=='Announced'||!watch&&phase!=='Casting')throw Error(watch?'This project is not announced.':'Casting is not open.');
- if(offerConflict(s,catalogue,p))throw Error('The filming dates conflict with an accepted commitment.');
+ if(offerConflict(s,catalogue,p))throw Error(conflictText(conflictDetails(s,catalogue,p))||'The filming dates clash with another commitment.');
  if(s.casts[`${p.id}:${index}`]||s.choices.includes(`${p.id}:${index}`))throw Error('This part has already been decided.');
  const existing=s.applications.find(a=>a.personId===s.activeId&&a.projectId===p.id&&a.index===index&&!['rejected','expired','withdrawn'].includes(a.status));if(existing)return existing;
  const end=projectSchedule(p).castingEnd,a={id:`application-${s.nextId++}`,personId:s.activeId,projectId:p.id,year:p.year,title:p.title,index,character:p.roles[index].character,status:watch?'watching':'considering',appliedOn:currentDate(s),readyOn:[plusDays(currentDate(s),7),plusDays(end,-1)].sort()[0],expiresOn:end};
@@ -195,6 +196,7 @@ export function resolveLifeEvent(s,catalogue,id,answer,{guestId=null}={}){
  else if(e.type==='legacy'){if(answer.startsWith('heir:')){continueAs(s,answer.slice(5));e.outcome='The story continues.'}else{s.awaitingHeir=false;e.outcome='This life is complete.'}}
  else if(['life','health','family'].includes(e.type)){e.outcome=resolveLifeChoice(s,catalogue,e,answer)}
  else if(['crime','affair'].includes(e.type)){e.outcome=resolveVice(s,catalogue,e,answer)}
+ else if(e.type==='ex'){e.outcome=resolveEx(s,catalogue,e,answer)}
  e.status='resolved';e.answer=answer;e.resolvedOn=date;profile.lastChoice=date;feed(s,e.title,e.outcome||`You chose: ${e.options.find(o=>o.id===answer).label}.`);return e.outcome||'';
 }
 export function nextScheduledDate(s,end){return s.commitments.filter(c=>c.personId===s.activeId&&c.status==='scheduled'&&c.start>currentDate(s)&&c.start<=end).map(c=>c.start).sort()[0]||end}
@@ -217,14 +219,14 @@ function relationshipEvents(s,catalogue){
   if(!r.dating&&personAge(s,p)>=18&&daysBetween(p.socialLife.lastChange,date)>90&&rand(s)<.005){p.socialLife=p.socialLife.status==='single'?{status:'dating',partnerName:['Alex','Taylor','Jamie'][fingerprint(p.name)%3]+' Vale',lastChange:date}:{status:'single',partnerName:null,lastChange:date};remember(s,p,'Their life moves forward',p.socialLife.status==='single'?'They mention that their relationship has ended.':'They mention someone new they have been seeing.')}
   if(r.dating){
    r.trust=limit(r.trust-(r.tension>60?1:0));if(r.public&&s.fame>=50&&personality(p).privacy)r.tension=limit(r.tension+.5);r.affection=limit(r.affection+(r.lastQuality&&daysBetween(r.lastQuality,date)<14?1:-.3));
-   if(r.tension>75&&rand(s)<.04){r.dating=false;r.status='ex';r.commitment=0;r.cohabiting=false;p.socialLife={status:'single',partnerName:null,lastChange:date};remember(s,p,'They end the relationship','They no longer feel that your needs and priorities can fit together. Your shared history remains.');continue}
+   if(r.tension>75&&rand(s)<.04){recordBreakup(s,r,'them','too much tension');r.dating=false;r.status='ex';r.commitment=0;r.cohabiting=false;p.socialLife={status:'single',partnerName:null,lastChange:date};remember(s,p,'They end the relationship','They no longer feel that your needs and priorities can fit together. Your shared history remains.');continue}
   }
   if(rand(s)>.025)continue;
   let event;
   if(p.rivalry>=35)event=queueEvent(s,'rivalry','A rivalry reaches the press',`${p.name} makes a pointed remark about your working relationship. How do you respond?`,[choice('private','Speak to them privately'),choice('public','Answer publicly'),choice('ignore','Let the work speak')],{personId:p.id});
   else if(r.dating&&r.status==='dating'&&r.commitment>=30&&daysBetween(r.datingSince||date,date)>=60&&t.intention!=='casual'){event=queueEvent(s,'relationship','They want to talk about commitment',`${p.name} wants to know whether you would like an exclusive relationship.`,[choice('accept','Discuss exclusivity together'),choice('boundary','Explain why I need more time'),choice('decline','Keep things casual')],{personId:p.id,action:'commit'})}
   else if(r.dating){const strained=r.tension>=35;event=queueEvent(s,'relationship',strained?'A conversation you cannot keep postponing':'They make time for you',strained?`${p.name} wants to talk about ${r.public&&s.fame>=50?'public attention and how to protect your privacy':r.cohabiting?'sharing responsibilities at home':'time apart and different expectations'}.`:`${p.name} suggests ${t.independence>60?'an evening without work or public attention':'spending a quiet evening together'}.`,[choice('listen','Listen and make time'),choice('boundary','Explain my boundaries'),choice('decline','Put work first this time')],{personId:p.id})}
-  else if(romanceAllowed(s,p)&&p.socialLife.status==='single'&&r.chemistry>=25&&r.friendship>=35){event=queueEvent(s,'relationship','They make the first move',`${p.name} asks whether you would like to try a date. Friendship does not obligate either of you to romance.`,[choice('accept','Accept the invitation'),choice('boundary','Keep getting to know each other'),choice('decline','Prefer to stay friends')],{personId:p.id,action:'date'})}
+  else if(romanceAllowed(s,p)&&p.socialLife.status==='single'&&!['ex','divorced','widowed'].includes(r.status)&&r.chemistry>=25&&r.friendship>=35){event=queueEvent(s,'relationship','They make the first move',`${p.name} asks whether you would like to try a date. Friendship does not obligate either of you to romance.`,[choice('accept','Accept the invitation'),choice('boundary','Keep getting to know each other'),choice('decline','Prefer to stay friends')],{personId:p.id,action:'date'})}
   else event=queueEvent(s,'friendship','A friend reaches out',`${p.name} ${t.ambition>65?'is unsure about a career decision':'is having a difficult time and could use company'}.`,[choice('help','Make time to support them'),choice('honest','Listen, but be honest about my availability'),choice('decline','Keep my distance')],{personId:p.id});
   if(event){profile.lastStory=date;return}
  }

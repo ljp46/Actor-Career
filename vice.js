@@ -1,7 +1,7 @@
 // v1.8 vice: affairs, homewrecking, crime, courts and prison. All fictional gameplay.
 // Romance between the player and someone else stays adult-only (both 18+).
 import {active,currentDate,available} from './engine.js?v=17';
-import {bond,personAge,romanceAllowed} from './relationships.js?v=17';
+import {bond,personAge,romanceAllowed,recordBreakup} from './relationships.js?v=17';
 import {limit,feed,queueEvent,openLifeEvent,dateOf,plusDays,daysBetween,random,eraValue,ensureOverhaul,assets} from './game-rules.js?v=17';
 import {careerProfile,pendingOffers,makeOffer,terminateContract} from './career.js?v=17';
 import {nudge,ageOf} from './life.js?v=17';
@@ -23,8 +23,8 @@ export const isTaken=(s,p)=>Boolean(p?.socialLife&&p.socialLife.status!=='single
 export function exclusivePartners(s,except=null){return s.people.filter(p=>p.alive&&p.id!==s.activeId&&p.name!==except?.name&&s.relationships?.[p.name]?.dating&&!s.relationships[p.name].affair&&EXCLUSIVE.includes(s.relationships[p.name].status))}
 export const cheatingWith=(s,p)=>exclusivePartners(s,p).length>0||isTaken(s,p);
 
-export function endRelationship(s,p,{byThem=false,why=''}={}){
- const r=bond(s,p),married=r.status==='married';let settlement=0;
+export function endRelationship(s,p,{byThem=false,why='',reason=''}={}){
+ const r=bond(s,p),married=r.status==='married';let settlement=0;recordBreakup(s,r,byThem?'them':'you',reason||(byThem?'they ended it':'your decision'));
  if(married){settlement=Math.round(Math.max(0,s.money)*(byThem?.4:.3));s.money-=settlement}
  r.dating=false;r.affair=false;r.status=married?'divorced':'ex';r.cohabiting=false;r.commitment=0;r.tension=limit((r.tension||0)+30);r.trust=limit((r.trust||40)-30);r.suspicion=0;r.spaceUntil=plusDays(dateOf(s),60);
  if(p.socialLife?.partnerId===s.activeId)p.socialLife={status:'single',partnerName:null,lastChange:dateOf(s)};
@@ -32,7 +32,7 @@ export function endRelationship(s,p,{byThem=false,why=''}={}){
  remember(s,p,married?'A divorce':'It is over',`${why}${married?` The divorce costs you ${fmt(settlement)}.`:''}`.trim());
  return settlement;
 }
-function makeOpen(s,p){const r=bond(s,p);r.dating=true;r.affair=exclusivePartners(s,p).length>0;r.status=r.affair?'affair':'dating';r.datingSince??=dateOf(s);p.socialLife={status:'dating',partnerId:s.activeId,partnerName:active(s).name,lastChange:dateOf(s)};if(!r.affair)r.exposure=0}
+function makeOpen(s,p){const r=bond(s,p);if(!r.dating)r.timesTogether=(r.timesTogether||0)+1;r.dating=true;r.affair=exclusivePartners(s,p).length>0;r.status=r.affair?'affair':'dating';r.datingSince??=dateOf(s);p.socialLife={status:'dating',partnerId:s.activeId,partnerName:active(s).name,lastChange:dateOf(s)};if(!r.affair)r.exposure=0}
 function tabloid(s,p,line){const life=ensureOverhaul(s);if(s.fame<35&&(p?.fame||0)<45)return '';life.publicImage=limit(life.publicImage-6);s.fame=limit(s.fame+.5);return ` ${line||'The tabloids get hold of the story.'}`}
 
 // ---------------------------------------------------------- cheating & homewrecking
@@ -131,7 +131,7 @@ export function jail(s,catalogue,months,crime){
  for(const t of (s.tvCareers||[]).filter(t=>t.personId===a.id&&t.status==='active')){t.status='left';t.leftOn=date;t.next=null}
  for(const k of (s.contracts||[]).filter(k=>k.personId===a.id&&k.status==='active'))try{terminateContract(s,k.id,'a prison sentence')}catch{}
  careerProfile(s).reputation=limit(careerProfile(s).reputation-20);ensureOverhaul(s).publicImage=limit(ensureOverhaul(s).publicImage-15);
- for(const p of exclusivePartners(s)){const r=bond(s,p);if(r.status!=='married'&&roll(s)<.4)endRelationship(s,p,{byThem:true,why:`${p.name} cannot wait for you.`})}
+ for(const p of exclusivePartners(s)){const r=bond(s,p);if(r.status!=='married'&&roll(s)<.4)endRelationship(s,p,{byThem:true,why:`${p.name} cannot wait for you.`,reason:'your prison sentence'})}
  nudge(s,{happiness:-20});
  feed(s,'Prison',`Sentenced to ${months} months for ${crime}.${lost?` You lose ${lost} ${lost===1?'role':'roles'}.`:''}`);
 }
@@ -204,24 +204,24 @@ export function resolveVice(s,catalogue,e,answer){
  if(d.kind==='caught'){const other=s.people.find(x=>x.name===d.other);
   if(answer==='confess'){const forgive=limit(((r.trust||40)+(r.commitment||30))/250-(r.betrayals||0)*.15,.1,.75);r.betrayals=(r.betrayals||0)+1;r.suspicion=0;
    if(x<forgive){r.trust=limit((r.trust||40)-25);r.tension=limit((r.tension||0)+30);r.forgaveOn=dateOf(s);nudge(s,{happiness:-6});return `${p.name} is devastated, but agrees to try again. Trust will take a long time to rebuild.`+tabloid(s,p)}
-   endRelationship(s,p,{byThem:true,why:`${p.name} cannot forgive you.`});return `${p.name} ends it.`+tabloid(s,p,'"Caught cheating" headlines follow you for weeks.')}
-  if(answer==='deny'){if((r.suspicion||0)<70&&x<.5){r.suspicion=Math.max(0,(r.suspicion||0)-25);r.tension=limit((r.tension||0)+10);return `${p.name} wants to believe you. For now, they do.`}r.suspicion=0;endRelationship(s,p,{byThem:true,why:`${p.name} knows you are lying.`});return `${p.name} has the screenshots. Lying makes it worse, and they leave you.`+tabloid(s,p)}
-  r.suspicion=0;endRelationship(s,p,{why:`You leave ${p.name}.`});if(other&&s.relationships[other.name]?.dating&&!isTaken(s,other))makeOpen(s,other);return `You leave ${p.name}.${other&&!isTaken(s,other)?` You and ${other.name} are now out in the open.`:''}`+tabloid(s,p);
+   endRelationship(s,p,{byThem:true,why:`${p.name} cannot forgive you.`,reason:'you cheated'});return `${p.name} ends it.`+tabloid(s,p,'"Caught cheating" headlines follow you for weeks.')}
+  if(answer==='deny'){if((r.suspicion||0)<70&&x<.5){r.suspicion=Math.max(0,(r.suspicion||0)-25);r.tension=limit((r.tension||0)+10);return `${p.name} wants to believe you. For now, they do.`}r.suspicion=0;endRelationship(s,p,{byThem:true,why:`${p.name} knows you are lying.`,reason:'you cheated and lied about it'});return `${p.name} has the screenshots. Lying makes it worse, and they leave you.`+tabloid(s,p)}
+  r.suspicion=0;endRelationship(s,p,{why:`You leave ${p.name}.`,reason:'you left them for someone else'});if(other&&s.relationships[other.name]?.dating&&!isTaken(s,other))makeOpen(s,other);return `You leave ${p.name}.${other&&!isTaken(s,other)?` You and ${other.name} are now out in the open.`:''}`+tabloid(s,p);
  }
  if(d.kind==='exposed'){const them=p.socialLife?.partnerName||'their partner';
-  if(answer==='fight'){if(x<limit((r.chemistry+(r.affection||0)+r.friendship)/300,.15,.8)){p.formerPartner=them;makeOpen(s,p);remember(s,p,'They chose you',`${p.name} leaves ${them} for you.`);return `${p.name} leaves ${them} and chooses you.`+tabloid(s,p)}r.dating=false;r.affair=false;r.status='ex';r.spaceUntil=plusDays(dateOf(s),60);nudge(s,{happiness:-8});remember(s,p,'They chose their partner',`${p.name} stays with ${them} and ends things with you.`);return `${p.name} chooses ${them}. It is over between you.`}
+  if(answer==='fight'){if(x<limit((r.chemistry+(r.affection||0)+r.friendship)/300,.15,.8)){p.formerPartner=them;makeOpen(s,p);remember(s,p,'They chose you',`${p.name} leaves ${them} for you.`);return `${p.name} leaves ${them} and chooses you.`+tabloid(s,p)}recordBreakup(s,r,'them','they stayed with their partner');r.dating=false;r.affair=false;r.status='ex';r.spaceUntil=plusDays(dateOf(s),60);nudge(s,{happiness:-8});remember(s,p,'They chose their partner',`${p.name} stays with ${them} and ends things with you.`);return `${p.name} chooses ${them}. It is over between you.`}
   if(answer==='lie'){if(x<.5)return 'The cover story holds. Barely.';p.socialLife={status:'single',partnerName:null,lastChange:dateOf(s)};if(r.dating&&!exclusivePartners(s,p).length){makeOpen(s,p);return `${them} does not buy it and leaves ${p.name}. You two are free to be together.`}return `${them} does not buy it and leaves ${p.name}.`}
-  r.dating=false;r.affair=false;r.status='ex';r.friendship=limit(r.friendship-10,-100,100);return `You end things with ${p.name} before it gets any messier.`;
+  recordBreakup(s,r,'you','it was getting messy');r.dating=false;r.affair=false;r.status='ex';r.friendship=limit(r.friendship-10,-100,100);return `You end things with ${p.name} before it gets any messier.`;
  }
  if(d.kind==='ultimatum'){const main=s.people.find(x=>x.id===d.mainId);
-  if(answer==='leave'&&main){endRelationship(s,main,{why:`You leave ${main.name} for ${p.name}.`});makeOpen(s,p);return `You leave ${main.name}. You and ${p.name} are together, openly.`+tabloid(s,p)}
-  if(answer==='stay'){r.tension=limit((r.tension||0)+20);if(x<.3){r.dating=false;r.affair=false;r.status='ex';return `${p.name} is done waiting and ends it.`}return `${p.name} agrees to wait, unhappily.`}
-  r.dating=false;r.affair=false;r.status='ex';r.spaceUntil=plusDays(dateOf(s),60);return `You end the affair with ${p.name}.`;
+  if(answer==='leave'&&main){endRelationship(s,main,{why:`You leave ${main.name} for ${p.name}.`,reason:'you left them for someone else'});makeOpen(s,p);return `You leave ${main.name}. You and ${p.name} are together, openly.`+tabloid(s,p)}
+  if(answer==='stay'){r.tension=limit((r.tension||0)+20);if(x<.3){recordBreakup(s,r,'them','tired of being a secret');r.dating=false;r.affair=false;r.status='ex';return `${p.name} is done waiting and ends it.`}return `${p.name} agrees to wait, unhappily.`}
+  recordBreakup(s,r,'you','you ended the affair');r.dating=false;r.affair=false;r.status='ex';r.spaceUntil=plusDays(dateOf(s),60);return `You end the affair with ${p.name}.`;
  }
  if(d.kind==='their-affair'){
   if(answer==='forgive'){r.trust=limit((r.trust||40)-20);r.tension=limit((r.tension||0)+15);r.forgaveOn=dateOf(s);nudge(s,{happiness:-8});return `You forgive ${p.name}. It still hurts.`}
-  if(answer==='confront'){if(x<.5){r.trust=limit((r.trust||40)-10);r.forgaveOn=dateOf(s);nudge(s,{happiness:-5});return `${p.name} breaks down, ends the other relationship and begs for another chance.`}endRelationship(s,p,{why:`${p.name} admits it and leaves you for the other person.`});return `${p.name} admits everything, and leaves you for them.`}
-  endRelationship(s,p,{why:`You leave ${p.name} after finding out they cheated.`});return `You leave ${p.name}.`;
+  if(answer==='confront'){if(x<.5){r.trust=limit((r.trust||40)-10);r.forgaveOn=dateOf(s);nudge(s,{happiness:-5});return `${p.name} breaks down, ends the other relationship and begs for another chance.`}endRelationship(s,p,{byThem:true,why:`${p.name} admits it and leaves you for the other person.`,reason:'they cheated'});return `${p.name} admits everything, and leaves you for them.`}
+  endRelationship(s,p,{why:`You leave ${p.name} after finding out they cheated.`,reason:'they cheated'});return `You leave ${p.name}.`;
  }
  return '';
 }

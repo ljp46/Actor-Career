@@ -1,9 +1,9 @@
 // v1.7 life simulation: wellbeing, health, ageing, death, legacy, activities,
 // pets and random life events. All events are fictional gameplay.
 import {active,person,uniqueName,die,switchTo,currentDate} from './engine.js?v=17';
-import {bond,personAge,romanceAllowed} from './relationships.js?v=17';
+import {bond,personAge,romanceAllowed,recordBreakup} from './relationships.js?v=17';
 import {limit,feed,queueEvent,openLifeEvent,dateOf,plusDays,daysBetween,random,eraValue,ensureOverhaul,calendarReason,reserve,fingerprint,assets} from './game-rules.js?v=17';
-import {careerProfile} from './career.js?v=17';
+import {careerProfile,conflictDetails,conflictText} from './career.js?v=17';
 
 export const LIFE_VERSION=1;
 const roll=s=>random(s);
@@ -94,7 +94,7 @@ export function lifeTick(s,catalogue,{days=7}={}){
  const risk=annualMortality(age,s.health)*days/365;
  if(s.health<=0||roll(s)<risk){handleDeath(s,catalogue,causeOfDeath(s,age));return}
  // Fresh offers and invitations become popups instead of hiding on the main screen
- announceOffers(s);
+ announceOffers(s,catalogue);
  // Random life events
  if(!openLifeEvent(s)&&roll(s)<Math.min(.6,.15*weeks))randomEvent(s,catalogue);
  st.lastTick=date;
@@ -268,7 +268,7 @@ export function familyAction(s,p,kind){
   case 'money':{r.askedOn=dateOf(s);const chance=limit((r.friendship+40)/150,.15,.85);if(x<chance){const gift=cash(s,(ageOf(s)<18?40:800)*(1+roll(s)*3));s.money+=gift;return out('A loan from family',`They give you ${fmtCash(gift)}.`)}r.friendship=limit(r.friendship-4,-100,100);return out('Turned down','They say no, and look a little hurt you asked.')}
   case 'argue':r.friendship=limit(r.friendship-10,-100,100);r.tension=limit((r.tension||0)+12);nudge(s,{happiness:-3});return out('An argument',pickOne(s,['It escalates fast. Doors are slammed.','You both say things you do not mean.','It ends in silence.']));
   case 'baby':{r.lastQuality=dateOf(s);const fertility=limit(.35-Math.max(0,ageOf(s)-35)*.025,.05,.35);if(x<fertility){s.pregnancy={personId:s.activeId,partnerId:p.id,due:plusDays(dateOf(s),270)};return out('A baby is on the way','You are expecting. The due date is in about nine months.')}return out('Trying for a baby','Not yet. You decide to keep trying.')}
-  case 'divorce':{const settlement=Math.round(Math.max(0,s.money)*.4);s.money-=settlement;r.dating=false;r.status='divorced';r.cohabiting=false;r.commitment=0;r.tension=limit((r.tension||0)+30);if(p.socialLife)p.socialLife={status:'single',partnerName:null,lastChange:dateOf(s)};nudge(s,{happiness:-15});return out('A divorce',`The marriage is over. The settlement and legal fees cost you ${fmtCash(settlement)}.`)}
+  case 'divorce':{const settlement=Math.round(Math.max(0,s.money)*.4);s.money-=settlement;recordBreakup(s,r,'you','you filed for divorce');r.dating=false;r.status='divorced';r.cohabiting=false;r.commitment=0;r.tension=limit((r.tension||0)+30);if(p.socialLife)p.socialLife={status:'single',partnerName:null,lastChange:dateOf(s)};nudge(s,{happiness:-15});return out('A divorce',`The marriage is over. The settlement and legal fees cost you ${fmtCash(settlement)}.`)}
  }
 }
 function pregnancyTick(s){const pr=s.pregnancy;if(!pr||pr.personId!==s.activeId||dateOf(s)<pr.due)return;s.pregnancy=null;const partner=s.people.find(p=>p.id===pr.partnerId),child=addChild(s,{otherParent:partner});queueEvent(s,'family','A baby is born',`${child.name} is born${partner?`, a child with ${partner.name}`:''}. You are a parent.`,[choice('ack','Hold them')],{kind:'ack'})}
@@ -281,11 +281,12 @@ export function adoptPet(s,type){const t=petTypes.find(p=>p.id===type);if(!t)thr
 export const petCosts=s=>(s.pets||[]).filter(p=>p.ownerId===s.activeId&&p.alive).reduce((n,p)=>n+p.monthly,0)*eraValue(s.year);
 
 // ----------------------------------------------------------- offer popups
-function announceOffers(s){
+function announceOffers(s,catalogue=[]){
  for(const o of (s.roleOffers||[]).filter(o=>o.personId===s.activeId&&o.status==='offered'&&!o.announced)){
   o.announced=true;
   const label={'tv-return':'Your show wants you back',spinoff:'A spin-off with your name on it',revival:'They are bringing it back','legacy-sequel':'A legacy sequel',contract:'Your franchise return',agent:'Your agent found you a role',studio:'A studio wants you'}[o.source]||'You got the part';
-  queueEvent(s,'offer',label,`${o.title}: they want you as ${o.character} for ${fmtCash(o.fee)}${o.agentCommission?` (${Math.round(o.agentCommission*100)}% to your agent)`:''}. Decide by ${o.expiresOn}.`,[choice('accept','Accept the role'),choice('later','Let me think about it'),choice('decline','Turn it down')],{offerId:o.id},`offer-${o.id}`);
+  const p=[...catalogue,...s.projects].find(x=>x.id===o.projectId),clash=p?conflictDetails(s,catalogue,p,o.contractId):[],blocking=clash.filter(x=>!(o.tvCareerId||o.contractId)||!x.movable),moving=clash.filter(x=>(o.tvCareerId||o.contractId)&&x.movable);
+  queueEvent(s,'offer',label,`${o.title}: they want you as ${o.character} for ${fmtCash(o.fee)}${o.agentCommission?` (${Math.round(o.agentCommission*100)}% to your agent)`:''}. Decide by ${o.expiresOn}.${blocking.length?`\n\n⚠ ${conflictText(blocking)} Turn that down first, or decline this.`:''}${moving.length?`\n\nYour show comes first: ${moving.map(x=>x.title).join(' and ')} will move its shoot to fit around it.`:''}`,[choice('accept','Accept the role'),choice('later','Let me think about it'),choice('decline','Turn it down')],{offerId:o.id},`offer-${o.id}`);
  }
 }
 

@@ -126,7 +126,32 @@ export function franchisePlan(s,p,index,data){
  }).slice(0,2)
 }
 export function reservations(s){return (s.contracts||[]).filter(c=>c.personId===s.activeId&&c.status==='active').flatMap(c=>c.entries.filter(e=>e.status==='reserved'||e.status==='offered').map(e=>({contractId:c.id,entry:e,schedule:projectSchedule(e.project)})))}
-export function offerConflict(s,catalogue,p,exceptContract=null){
+const fmtD=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+export const continuationMovable=(s,q)=>Boolean(q?.generated&&['spinoff','revival','legacy-sequel'].includes(q.continuationType)&&currentDate(s)<projectSchedule(q).filmingStart);
+// Every commitment a production would clash with, with titles and dates. Movable items are
+// game-made spin-offs not yet filming; they give way to a returning season of your own show.
+export function conflictDetails(s,catalogue,p,exceptContract=null){
+ const t=projectSchedule(p),out=[],seen=new Set(),add=(id,title,start,end,kind,movable=false)=>{if(seen.has(id))return;seen.add(id);out.push({id,title,start,end,kind,movable,label:`${title} (${fmtD(start)} – ${fmtD(end)})`})};
+ for(const c of (s.commitments||[]).filter(c=>c.personId===s.activeId&&c.status==='scheduled'&&t.filmingStart<c.end&&c.start<t.filmingEnd))add(c.id,c.title,c.start,c.end,c.kind||'commitment');
+ const ids=new Set(s.filmography.filter(f=>f.personId===s.activeId&&f.status!=='withdrawn'&&f.status!=='released').map(f=>f.projectId));
+ for(const q of allProjects(s,catalogue))if(ids.has(q.id)&&q.id!==p.id){const b=projectSchedule(q);if(intersects(t,b))add(q.id,q.title,b.filmingStart,b.filmingEnd,'booked',continuationMovable(s,q))}
+ for(const r of reservations(s))if(r.contractId!==exceptContract&&r.entry.project.id!==p.id&&intersects(t,r.schedule))add(r.entry.project.id,r.entry.project.title,r.schedule.filmingStart,r.schedule.filmingEnd,'contract');
+ for(const c of (s.tvCareers||[]).filter(c=>c.personId===s.activeId&&c.status==='active'&&c.next&&c.next.id!==p.id)){const b=projectSchedule(c.next);if(intersects(t,b))add(c.next.id,`${c.title} (next season)`,b.filmingStart,b.filmingEnd,'tv-return')}
+ return out;
+}
+export function conflictText(list){return list.length?`Clashes with ${list.map(x=>x.label).join(' and ')}.`:''}
+// Push movable spin-offs so they start after p wraps.
+export function rescheduleAround(s,catalogue,p){
+ const t=projectSchedule(p),moved=[];
+ for(const x of conflictDetails(s,catalogue,p).filter(x=>x.movable)){
+  const q=allProjects(s,catalogue).find(q=>q.id===x.id);if(!q)continue;const b=projectSchedule(q),shift=Math.max(0,Math.round((Date.parse(t.filmingEnd)-Date.parse(b.filmingStart))/86400000))+21;
+  for(const k of ['filmingStartDate','filmingEndDate','releaseDate'])q[k]=datePlus(q[k]||b[k.replace('Date','')],shift);if(q.finaleDate)q.finaleDate=datePlus(q.finaleDate,shift);q.year=Number(q.releaseDate.slice(0,4));
+  moved.push(q.title);log(s,'A schedule change',`${q.title} moves its shoot to start after ${p.title} wraps.`);
+ }
+ return moved;
+}
+export function offerConflict(s,catalogue,p,exceptContract=null,{yieldMovable=false}={}){
+ if(yieldMovable)return conflictDetails(s,catalogue,p,exceptContract).some(x=>!x.movable);
  const t=projectSchedule(p),ids=new Set(s.filmography.filter(f=>f.personId===s.activeId&&f.status!=='withdrawn').map(f=>f.projectId));
  return (s.overhaulVersion&&s.commitments?.some(c=>c.personId===s.activeId&&c.status==='scheduled'&&t.filmingStart<c.end&&c.start<t.filmingEnd))||allProjects(s,catalogue).some(booked=>ids.has(booked.id)&&booked.id!==p.id&&intersects(t,projectSchedule(booked)))||reservations(s).some(r=>r.contractId!==exceptContract&&r.entry.project.id!==p.id&&intersects(t,r.schedule))||s.tvCareers?.some(c=>c.personId===s.activeId&&c.status==='active'&&c.next&&c.next.id!==p.id&&intersects(t,projectSchedule(c.next)))
 }
@@ -134,7 +159,9 @@ export function acceptCareerOffer(s,catalogue,id,data,{multiFilm=false}={}){
  ensureCareer(s);const offer=pendingOffers(s).find(o=>o.id===id),p=offer&&lookup(s,catalogue,offer.projectId);
  if(!offer||!p)throw Error('This offer is unavailable.');
  if(currentDate(s)>=offer.expiresOn||currentDate(s)>=projectSchedule(p).filmingStart)throw Error('This offer has expired.');
- if(offerConflict(s,catalogue,p,offer.contractId))throw Error('This shoot conflicts with an accepted role or binding franchise commitment.');
+ const priority=Boolean(offer.tvCareerId||offer.contractId);
+ if(offerConflict(s,catalogue,p,offer.contractId,{yieldMovable:priority}))throw Error(conflictText(conflictDetails(s,catalogue,p,offer.contractId).filter(x=>!priority||!x.movable))||'This shoot clashes with another commitment.');
+ if(priority)rescheduleAround(s,catalogue,p);
  const role=p.roles[offer.index];if(!role||s.casts[`${p.id}:${offer.index}`]&&s.casts[`${p.id}:${offer.index}`]!==active(s).name)throw Error('The part has already been cast.');
  const plan=multiFilm?franchisePlan(s,p,offer.index,data):[];
  if(multiFilm&&!plan.length)throw Error('No matching returning character is mapped for this role yet.');
