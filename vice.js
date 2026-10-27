@@ -44,7 +44,8 @@ export function noteCheating(s,p,kind){
 }
 export function viceReason(s,p,kind){
  const r=bond(s,p);
- if(!romanceAllowed(s,p,{adult:true}))return 'Only between two adults.';
+ if(!romanceAllowed(s,p))return 'Not someone you can date.';
+ if(!romanceAllowed(s,p,{adult:true})&&exclusivePartners(s,p).length)return `You are with ${exclusivePartners(s,p)[0].name}. Break up with them first.`;
  if(inPrison(s))return 'Not from a prison cell.';
  if(!isTaken(s,p))return 'They are single. Just ask them out.';
  if(kind==='steal'&&r.chemistry<30)return 'Build some chemistry first (30+).';

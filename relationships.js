@@ -21,7 +21,7 @@ export function interactionReason(s,p,kind){
  const r=bond(s,p);
  const adultPair=romanceAllowed(s,p,{adult:true});
  if(s.prison&&s.prison.personId===s.activeId&&s.prison.until>date(s)&&['walk','outing','date','hookup'].includes(kind))return 'You are in prison. Conversations happen during visits.';
- if(s.overhaulVersion&&['flirt','date','hookup','reconcile'].includes(kind)&&p.socialLife&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating&&!adultPair)return 'They are already in a relationship.';
+ if(s.overhaulVersion&&['date','hookup','reconcile'].includes(kind)&&p.socialLife&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating&&!adultPair)return `They are with ${p.socialLife.partnerName||'someone'}. Ask them to leave first.`;
  if(kind==='commit'&&p.socialLife&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId)return `They are still with ${p.socialLife.partnerName||'someone'}. Ask them to leave first.`;
  if(['flirt','date','commit','reconcile'].includes(kind)&&!romanceAllowed(s,p))return 'Dating starts at 13, with close-age matches for teenagers.';
  if(kind==='hookup'&&!romanceAllowed(s,p,{adult:true}))return 'Private nights are available only between unrelated adults.';
