@@ -14,6 +14,8 @@ export function ensureCareer(s){
  s.careerProfiles??={};s.careerProfiles[s.activeId]??={reputation:60,agent:null};
  s.preparations??={};s.careerAuditions??=[];s.roleOffers??=[];s.contracts??=[];s.productionEvents??=[];s.productionOutcomes??={};s.worldChanges??=[];s.customCollections??={};
  s.tvCareers??=[];s.filmCareers??=[];s.continuityDecisions??={};s.showChanges??={};s.continuityChanges??=[];s.continuityRequests??=[];
+ // Saves from before v1.9.1: a season you had already signed for stayed booked after leaving its show.
+ for(const f of s.filmography)if(f.status==='booked'&&f.tvCareerId&&s.tvCareers.find(c=>c.id===f.tvCareerId)?.status==='left'){f.status='withdrawn';f.withdrawnOn=currentDate(s);if(Number.isInteger(f.roleIndex)&&s.casts[`${f.projectId}:${f.roleIndex}`]===s.people.find(p=>p.id===f.personId)?.name)delete s.casts[`${f.projectId}:${f.roleIndex}`]}
  return s
 }
 export const careerProfile=s=>(ensureCareer(s),s.careerProfiles[s.activeId]);
@@ -134,9 +136,9 @@ export function conflictDetails(s,catalogue,p,exceptContract=null){
  const t=projectSchedule(p),out=[],seen=new Set(),add=(id,title,start,end,kind,movable=false)=>{if(seen.has(id))return;seen.add(id);out.push({id,title,start,end,kind,movable,label:`${title} (${fmtD(start)} – ${fmtD(end)})`})};
  for(const c of (s.commitments||[]).filter(c=>c.personId===s.activeId&&c.status==='scheduled'&&t.filmingStart<c.end&&c.start<t.filmingEnd))add(c.id,c.title,c.start,c.end,c.kind||'commitment');
  const ids=new Set(s.filmography.filter(f=>f.personId===s.activeId&&f.status!=='withdrawn'&&f.status!=='released').map(f=>f.projectId));
- for(const q of allProjects(s,catalogue))if(ids.has(q.id)&&q.id!==p.id){const b=projectSchedule(q);if(intersects(t,b))add(q.id,q.title,b.filmingStart,b.filmingEnd,'booked',continuationMovable(s,q))}
+ for(const q of allProjects(s,catalogue))if(ids.has(q.id)&&q.id!==p.id){const b=projectSchedule(q);if(intersects(t,b)){add(q.id,q.title,b.filmingStart,b.filmingEnd,'booked',continuationMovable(s,q));const f=s.filmography.find(f=>f.personId===s.activeId&&f.projectId===q.id&&f.status!=='withdrawn');if(out.at(-1)?.id===q.id){out.at(-1).droppable=f?.status==='booked';out.at(-1).careerId=f?.tvCareerId&&s.tvCareers.find(c=>c.id===f.tvCareerId&&c.status==='active')?.id}}}
  for(const r of reservations(s))if(r.contractId!==exceptContract&&r.entry.project.id!==p.id&&intersects(t,r.schedule))add(r.entry.project.id,r.entry.project.title,r.schedule.filmingStart,r.schedule.filmingEnd,'contract');
- for(const c of (s.tvCareers||[]).filter(c=>c.personId===s.activeId&&c.status==='active'&&c.next&&c.next.id!==p.id)){const b=projectSchedule(c.next);if(intersects(t,b))add(c.next.id,`${c.title} (next season)`,b.filmingStart,b.filmingEnd,'tv-return')}
+ for(const c of (s.tvCareers||[]).filter(c=>c.personId===s.activeId&&c.status==='active'&&c.next&&c.next.id!==p.id)){const b=projectSchedule(c.next);if(intersects(t,b)){add(c.next.id,`${c.title} (next season)`,b.filmingStart,b.filmingEnd,'tv-return');out.at(-1).careerId=c.id}}
  return out;
 }
 export function conflictText(list){return list.length?`Clashes with ${list.map(x=>x.label).join(' and ')}.`:''}
@@ -211,10 +213,28 @@ export function declineCareerOffer(s,id){
  offer.declinedOn=currentDate(s);if(s.overhaulVersion){const life=s.lifeProfiles?.[s.activeId],top=Object.values(life?.identities||{}).find(i=>i.character===offer.character);if(top)top.strength=Math.max(0,top.strength-2)}
  log(s,'Choosing a different path',`You decline ${offer.title}. No franchise obligation was signed.`)
 }
+function dropCredit(s,f,penalty){
+ f.status='withdrawn';f.withdrawnOn=currentDate(s);const name=active(s).name;
+ if(Number.isInteger(f.roleIndex)&&s.casts[`${f.projectId}:${f.roleIndex}`]===name)delete s.casts[`${f.projectId}:${f.roleIndex}`];
+ for(const a of s.applications||[])if(a.personId===s.activeId&&a.projectId===f.projectId&&a.status==='accepted')a.status='withdrawn';
+ if(penalty)careerProfile(s).reputation=clamp(careerProfile(s).reputation-penalty,0,100);
+}
+// Drop out of a role you have accepted but not started filming. Studios remember it.
+export function withdrawBooking(s,projectId){
+ ensureCareer(s);const f=s.filmography.find(f=>f.personId===s.activeId&&f.projectId===projectId&&f.status==='booked');
+ if(!f)throw Error('You can only drop out before filming starts.');
+ const series=f.tvCareerId&&s.tvCareers.find(c=>c.id===f.tvCareerId&&c.status==='active');
+ dropCredit(s,f,8);
+ if(f.contractId){const k=s.contracts.find(k=>k.id===f.contractId&&k.status==='active');if(k)terminateContract(s,k.id,'dropping out')}
+ if(series&&series.lastProjectId===projectId){series.status='left';series.leftOn=currentDate(s);series.next=null}
+ log(s,'Dropping out',`You drop out of ${f.title}${series?`, and leave ${series.title}`:''}. The studio is not pleased.`);return f;
+}
 export function leaveSeries(s,id){
  ensureCareer(s);const c=s.tvCareers.find(c=>c.id===id&&c.personId===s.activeId&&c.status==='active');if(!c)throw Error('This series role is no longer active.');
  c.status='left';c.leftOn=currentDate(s);c.next=null;
  for(const o of s.roleOffers)if(o.tvCareerId===id&&o.status==='offered')o.status='declined';
+ // Leaving also cancels any season of this show you had already signed for but not started.
+ for(const f of s.filmography.filter(f=>f.personId===s.activeId&&f.status==='booked'&&(f.tvCareerId===c.id||f.seriesId&&f.seriesId===c.seriesId)))dropCredit(s,f,0);
  log(s,'Leaving a series',`You leave ${c.title} as ${c.character}. The writers and studio will have to decide how the show continues without you.`);return c
 }
 export function onSetAction(s,catalogue,projectId,kind){

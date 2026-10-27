@@ -1,6 +1,6 @@
 // v1.6/1.7 interface: BitLife-style life screen, assets, activities, career hub and legacy.
 import {active,ageAt,currentDate,projectSchedule,filmingProjects,available,roleFit,projectPhase,train,lifestyle,genderLabel,normaliseGender} from './engine.js?v=17';
-import {careerProfile,pendingOffers,pendingAuditions,preparation,prepareAudition,onSetAction} from './career.js?v=17';
+import {careerProfile,pendingOffers,pendingAuditions,preparation,prepareAudition,onSetAction,withdrawBooking} from './career.js?v=17';
 import {careerHubMarkup,bindCareerHub} from './career-ui.js?v=17';
 import {featuredOpportunities,applyRole,forceRole,submitAudition,buyAsset,sellAsset} from './overhaul.js?v=17';
 import {ensureOverhaul,roleAssessment,knownFor,assets,eraValue,lifestyles,monthlyCosts,assetValue,dateOf} from './game-rules.js?v=17';
@@ -132,7 +132,8 @@ function renderCredits(root,u){
  root.innerHTML=`<div class="money-grid"><div><span>Credits</span><b>${credits.length}</b></div><div><span>Released</span><b>${credits.filter(f=>!f.status||f.status==='released').length}</b></div><div><span>Awards won</span><b>${won}</b></div><div><span>Reputation</span><b>${Math.round(careerProfile(s).reputation)}</b></div></div>
  ${scheduleMarkup(s,u)}
  ${awardsMarkup(s,{esc:u.esc,fmtDate:u.fmtDate})}
- <div class="list">${credits.map(f=>`<div class="list-row"><div class="main"><strong>${u.esc(f.title)}</strong><small>${f.year} · ${u.esc(f.kind==='TV series'?'TV':'Film')} · as ${u.esc(f.role)}</small>${f.outcome?`<small>${u.esc(f.outcome.result)} · critics ${f.outcome.critics} · audience ${f.outcome.audience}</small>`:''}</div><div class="side"><b>${u.esc(f.status==='released'||!f.status?'Released':f.status)}</b>${f.outcome?`${f.outcome.performance}/100`:''}</div></div>`).join('')||'<p class="empty">No credits yet. Your first role is out there.</p>'}</div>`;
+ <div class="list">${credits.map(f=>`<div class="list-row"><div class="main"><strong>${u.esc(f.title)}</strong><small>${f.year} · ${u.esc(f.kind==='TV series'?'TV':'Film')} · as ${u.esc(f.role)}</small>${f.outcome?`<small>${u.esc(f.outcome.result)} · critics ${f.outcome.critics} · audience ${f.outcome.audience}</small>`:''}</div><div class="side"><b>${u.esc(f.status==='released'||!f.status?'Released':f.status)}</b>${f.outcome?`${f.outcome.performance}/100`:''}${f.status==='booked'?`<button class="small" data-drop-booking="${u.esc(f.projectId)}" data-title="${u.esc(f.title)}">Drop out</button>`:''}</div></div>`).join('')||'<p class="empty">No credits yet. Your first role is out there.</p>'}</div>`;
+ root.querySelectorAll('[data-drop-booking]').forEach(b=>b.onclick=()=>{if(!confirm(`Drop out of ${b.dataset.title}? Your reputation takes a hit, and if it is a season of a show, you leave the show.`))return;u.action(()=>withdrawBooking(u.state,b.dataset.dropBooking))});
 }
 
 // --------------------------------------------------------------- assets tab
