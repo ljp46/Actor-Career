@@ -1,5 +1,5 @@
-import {currentDate,projectSchedule} from './engine.js?v=16';
-import {careerProfile,agentChoices,pendingAuditions,pendingOffers,preparation,prepareAudition,attendCallback,hireAgent,searchAgentOffers,negotiateOffer,franchisePlan,offerConflict,acceptCareerOffer,declineCareerOffer,terminateContract,resolveProductionEvent,leaveSeries} from './career.js?v=16';
+import {currentDate,projectSchedule} from './engine.js?v=17';
+import {careerProfile,agentChoices,pendingAuditions,pendingOffers,preparation,prepareAudition,attendCallback,hireAgent,searchAgentOffers,negotiateOffer,franchisePlan,offerConflict,acceptCareerOffer,declineCareerOffer,terminateContract,resolveProductionEvent,leaveSeries} from './career.js?v=17';
 
 export function careerHubMarkup(s,catalogue,data,{esc,money,fmtDate,history=false}){
  const profile=careerProfile(s),projects=new Map([...catalogue,...s.projects].map(p=>[p.id,p])),date=currentDate(s);

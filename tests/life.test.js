@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCareer,advance,bookRole,person,active} from '../engine.js?v=16';
-import {careerTick,acceptCareerOffer,pendingOffers} from '../career.js?v=16';
-import {migrateOverhaul,overhaulTick,resolveLifeEvent,buyAsset,sellAsset} from '../overhaul.js?v=16';
-import {ensureLife,lifeStats,weeklyLife,doActivity,activities,activityReason,contract,conditionsOf,treat,annualMortality,handleDeath,addChild,familyAction,familyActionReason,adoptPet,lifeSummary,partnerOf} from '../life.js?v=16';
-import {spinoffTick,launchSpinoff,launchRevival,launchLegacySequel,ensureSpinoffs,createContinuation} from '../spinoffs.js?v=16';
-import {openLifeEvent,monthlyCosts,assetValue,assets,ensureOverhaul,castingReason} from '../game-rules.js?v=16';
-import {bond} from '../relationships.js?v=16';
-import {continuityTick} from '../continuity.js?v=16';
+import {createCareer,advance,bookRole,person,active} from '../engine.js?v=17';
+import {careerTick,acceptCareerOffer,pendingOffers} from '../career.js?v=17';
+import {migrateOverhaul,overhaulTick,resolveLifeEvent,buyAsset,sellAsset} from '../overhaul.js?v=17';
+import {ensureLife,lifeStats,weeklyLife,doActivity,activities,activityReason,contract,conditionsOf,treat,annualMortality,handleDeath,addChild,familyAction,familyActionReason,adoptPet,lifeSummary,partnerOf} from '../life.js?v=17';
+import {spinoffTick,launchSpinoff,launchRevival,launchLegacySequel,ensureSpinoffs,createContinuation} from '../spinoffs.js?v=17';
+import {openLifeEvent,monthlyCosts,assetValue,assets,ensureOverhaul,castingReason} from '../game-rules.js?v=17';
+import {bond} from '../relationships.js?v=17';
+import {continuityTick} from '../continuity.js?v=17';
 
 const production=(id='one',options={})=>({id,title:id,year:2020,kind:'Film',director:'Director',genre:'Drama',releaseDate:'2020-12-01',filmingStartDate:'2020-03-01',filmingEndDate:'2020-05-01',castingStartDate:'2020-01-01',voteCount:5000,popularity:50,baselineRating:8,roles:[{character:'Alex Reed',actor:'Historical Star',birthYear:1996,gender:'male',ageMin:18,ageMax:30,characterAge:24},{character:'Sam Cole',actor:'Co Star',birthYear:1994,gender:'female',ageMin:18,ageMax:34,characterAge:26}],...options});
 function fixture(projects=[production()],birthday='1996-01-01'){const s=createCareer({name:'Test Actor',birthday,startDate:'2020-01-01',gender:'male'},projects);migrateOverhaul(s,projects);ensureLife(s);s.money=200000;s.skills={acting:90,drama:90,comedy:90};return s}
@@ -40,7 +40,7 @@ test('divorce splits the money and ends the marriage',()=>{const s=fixture([]);c
 
 test('the shop sells many homes and cars; owning a home cuts rent; pets add upkeep',()=>{const s=fixture([]);assert.ok(assets.filter(a=>a.kind==='home').length>=6);assert.ok(assets.filter(a=>a.kind==='car').length>=6);ensureOverhaul(s).lifestyle='comfortable';const before=monthlyCosts(s);buyAsset(s,'studio');assert.ok(monthlyCosts(s)<before+5000);adoptPet(s,'dog');assert.ok(s.pets.length===1);const owned=s.possessions.find(p=>p.id==='studio');jump(s,'2030-01-01');assert.ok(assetValue(s,owned)>owned.paid*.9);const money=s.money;const value=sellAsset(s,'studio');assert.equal(s.money,money+value)});
 
-test('offers pop up and can be accepted straight from the popup',async()=>{const {makeOffer}=await import('../career.js?v=16');const p=production(),s=fixture([p]);clear(s);const offer=makeOffer(s,p,0,{source:'studio'});weeklyLife(s,[p],1);const e=s.lifeEvents.find(e=>e.type==='offer');assert.ok(e);resolveLifeEvent(s,[p],e.id,'accept');assert.equal(offer.status,'accepted');assert.ok(s.filmography.some(f=>f.projectId===p.id))});
+test('offers pop up and can be accepted straight from the popup',async()=>{const {makeOffer}=await import('../career.js?v=17');const p=production(),s=fixture([p]);clear(s);const offer=makeOffer(s,p,0,{source:'studio'});weeklyLife(s,[p],1);const e=s.lifeEvents.find(e=>e.type==='offer');assert.ok(e);resolveLifeEvent(s,[p],e.id,'accept');assert.equal(offer.status,'accepted');assert.ok(s.filmography.some(f=>f.projectId===p.id))});
 
 test('v1.6: a beloved TV character gets a spin-off offer that pops up and books cleanly',()=>{const parent=production('Hit Show S1',{kind:'TV series',seriesId:'hit',seriesTitle:'Hit Show',seasonNumber:1}),s=fixture([parent]);bookRole(s,[parent],parent,parent.roles[0],0);s.filmography[0].status='released';jump(s,'2020-06-10');s.tvCareers=[{id:'tv-1',personId:'self',seriesId:'hit',title:'Hit Show',character:'Alex Reed',characterKey:'alex reed',status:'ended',fans:85,lastProjectId:parent.id,lastSeason:1,handled:[parent.id]}];const offer=launchSpinoff(s,[parent],s.tvCareers[0]);assert.equal(offer.source,'spinoff');const p=s.projects.find(x=>x.id===offer.projectId);assert.ok(p.generated&&p.franchiseContinuation);assert.equal(p.roles[0].actor,'Test Actor');assert.ok(p.roles.some(r=>r.character==='Sam Cole'));clear(s);weeklyLife(s,[parent],7);const e=s.lifeEvents.find(e=>e.type==='offer'&&e.data.offerId===offer.id);assert.ok(e,'offer popup');assert.match(e.title,/spin-off/i);resolveLifeEvent(s,[parent],e.id,'accept');assert.ok(s.filmography.some(f=>f.projectId===p.id&&f.personId==='self'))});
 

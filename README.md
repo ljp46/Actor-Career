@@ -2,6 +2,14 @@
 
 A mobile-first alternate-history actor life sim. Choose a birthday and starting date, audition inside a living film/TV world, change casting history, build a family and relationships, spend your earnings, and live until the very end.
 
+## Version 1.8 · Affairs and crime
+
+**Love life without the rules.** Adults can flirt with, secretly date or spend a private night with someone who is already taken. Their partner stays in the picture until something changes. On a taken person's profile, **Break them up** lets you ask them to leave their partner for you, or meddle in their relationship to split them up. Both can backfire.
+
+**Cheating.** You can see other people while committed, engaged or married. Every romantic moment builds your partner's suspicion, and eventually they find out: confess, deny everything, or leave them for the other person. Divorces cost a settlement, and famous players make the tabloids. An affair partner may push you to leave your partner, their partner can discover the two of you, and your own partner can cheat on you. Teenagers keep the existing rules: no pursuing someone who is taken, and nothing beyond close-age dating.
+
+**Crime.** A new Crime section in Activities: shoplifting, tagging walls, pickpocketing, selling bootlegs of your films, burglary, car theft, insurance fraud, bribing a casting director for a role, tax evasion and bank robbery. Juveniles get cautions, then juvenile detention on a third strike. Adults face fines, or arrest and a court popup (top lawyer, public defender or guilty plea). Prison costs you your bookings, offers and series roles, blocks auditions, shopping and outings, and has its own activities: yard workouts, the library, a prison drama group, good behaviour, appeals and escape attempts. A criminal record lowers your casting chances. Cheats can release you or clear your record.
+
 ## Version 1.7 · A whole life
 
 **New look.** A BitLife-style layout built for phones: your name, age, money and date are pinned at the top; your life story scrolls by age; stat bars for Happiness, Health, Looks, Fame, Acting and Energy sit above the bottom bar. The bar has Career, Assets, People and Activities, plus a central **+1 month** button. "Just a week", "Skip 3 months" and "Skip a year" are on the life screen.

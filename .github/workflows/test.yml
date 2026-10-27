@@ -46,6 +46,7 @@ jobs:
       - name: Browser regression, contracts and performance
         run: |
           python -m http.server 8765 --bind 127.0.0.1 &
+          node tests/browser-v18.cjs
           node tests/browser-v16.cjs
           node tests/browser-v15.cjs
           node tests/browser-v14.cjs

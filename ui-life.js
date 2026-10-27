@@ -1,19 +1,20 @@
 // v1.6/1.7 interface: BitLife-style life screen, assets, activities, career hub and legacy.
-import {active,ageAt,currentDate,projectSchedule,filmingProjects,available,roleFit,projectPhase,train,lifestyle,genderLabel,normaliseGender} from './engine.js?v=16';
-import {careerProfile,pendingOffers,pendingAuditions,preparation,prepareAudition,onSetAction} from './career.js?v=16';
-import {careerHubMarkup,bindCareerHub} from './career-ui.js?v=16';
-import {featuredOpportunities,applyRole,forceRole,submitAudition,buyAsset,sellAsset} from './overhaul.js?v=16';
-import {ensureOverhaul,roleAssessment,knownFor,assets,eraValue,lifestyles,monthlyCosts,assetValue,dateOf} from './game-rules.js?v=16';
-import {auditionPage} from './catalogue.js?v=16';
-import {lifeStats,ensureLife,activities,activityReason,activityCost,doActivity,conditionsOf,conditionTypes,treat,petTypes,adoptPet,lifeSummary,ageOf} from './life.js?v=16';
-import {renderWorld,awardsMarkup} from './overhaul-ui.js?v=16';
-import {personAge} from './relationships.js?v=16';
+import {active,ageAt,currentDate,projectSchedule,filmingProjects,available,roleFit,projectPhase,train,lifestyle,genderLabel,normaliseGender} from './engine.js?v=17';
+import {careerProfile,pendingOffers,pendingAuditions,preparation,prepareAudition,onSetAction} from './career.js?v=17';
+import {careerHubMarkup,bindCareerHub} from './career-ui.js?v=17';
+import {featuredOpportunities,applyRole,forceRole,submitAudition,buyAsset,sellAsset} from './overhaul.js?v=17';
+import {ensureOverhaul,roleAssessment,knownFor,assets,eraValue,lifestyles,monthlyCosts,assetValue,dateOf} from './game-rules.js?v=17';
+import {auditionPage} from './catalogue.js?v=17';
+import {lifeStats,ensureLife,activities,activityReason,activityCost,doActivity,conditionsOf,conditionTypes,treat,petTypes,adoptPet,lifeSummary,ageOf} from './life.js?v=17';
+import {renderWorld,awardsMarkup} from './overhaul-ui.js?v=17';
+import {personAge} from './relationships.js?v=17';
+import {crimes,crimeReason,commitCrime,inPrison,prisonActivities,prisonReason,prisonActivity,viceStatus,criminalRecord} from './vice.js?v=17';
 
 const initials=name=>String(name||'?').split(' ').filter(Boolean).slice(0,2).map(n=>n[0]).join('').toUpperCase();
 export const avatarClass=name=>`c${[...String(name)].reduce((n,c)=>n+c.charCodeAt(0),0)%6}`;
 export function avatar(p,{large=false}={}){return `<span class="avatar ${avatarClass(p.name)}${large?' large':''}${p.alive===false?' dead':''}" aria-hidden="true">${initials(p.name)}</span>`}
 const statColours={happiness:'var(--happy)',health:'var(--health)',looks:'var(--looks)',fame:'var(--fame)',acting:'var(--acting)'};
-export function statusLine(s){const a=active(s),age=ageOf(s),fame=s.fame;const label=age<5?'Toddler':age<13?'Child':age<18?'Teenager':fame>=80?'Global star':fame>=55?'Movie star':fame>=30?'Rising star':s.filmography.some(f=>f.personId===a.id)?'Working actor':'Aspiring actor';return `${label} · Age ${age}`}
+export function statusLine(s){const a=active(s),age=ageOf(s),fame=s.fame;const label=viceStatus(s)||(age<5?'Toddler':age<13?'Child':age<18?'Teenager':fame>=80?'Global star':fame>=55?'Movie star':fame>=30?'Rising star':s.filmography.some(f=>f.personId===a.id)?'Working actor':'Aspiring actor');return `${label} · Age ${age}`}
 
 // ------------------------------------------------------------------ chrome
 export function renderTopbar(el,u){
@@ -57,6 +58,8 @@ export function renderLife(root,u){
  root.querySelector('[data-rest]').onclick=async()=>{try{lifestyle(s,'rest');u.save();await u.advanceWeeks(1)}catch(e){u.toast(e.message)}};
 }
 function headline(s,shoots){
+ if(inPrison(s))return `In prison until ${new Date(s.prison.until+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`;
+ if(s.wanted?.personId===s.activeId)return 'On the run from the police';
  const age=ageOf(s),credits=s.filmography.filter(f=>f.personId===s.activeId),booked=credits.find(f=>f.status==='booked');
  if(shoots.length)return `Filming ${shoots[0].title}`;
  if(booked)return `Booked: ${booked.title}`;
@@ -97,7 +100,7 @@ function renderAuditions(root,u){
  const appRow=x=>{const p=[...c,...s.projects].find(p=>p.id===x.projectId);const label={watching:'Waiting for casting to open',considering:'Under consideration',invited:'Invited to audition',callback:'Callback booked',offered:'Offer received'}[x.status]||x.status;return `<div class="list-row"><div class="main"><strong>${u.esc(x.title)}</strong><small>${u.esc(x.character)} · ${u.esc(label)}${p&&['invited','callback'].includes(x.status)?` · prep ${preparation(s,p,x.index)}/60`:''}</small>${x.status==='invited'?`<div><button class="small" data-app-prepare="${u.esc(x.id)}">Study script</button><button class="small" data-app-coach="${u.esc(x.id)}">Coach</button><button class="primary" data-app-submit="${u.esc(x.id)}">Audition</button></div>`:''}${x.status==='offered'?`<div><button class="primary" data-seg-go="offers">Review offer</button></div>`:''}</div>${['invited','considering','callback'].includes(x.status)?`<button class="small" data-app-force="${u.esc(x.id)}">Force win</button>`:''}</div>`};
  const roleRow=(o,featuredRow=false)=>{const as=roleAssessment(s,o.project,o.index),t=projectSchedule(o.project);return `<div class="list-row"${featuredRow?' data-opportunity':''}><div class="main"><strong>${u.esc(o.project.title)}</strong><small>${u.esc(o.role.character)} · ${u.esc(as.billing)} · ${u.esc(o.project.kind==='TV series'?'TV':'Film')} ${o.project.year}</small><small>Script ${as.script} · Role ${as.quality} · films ${u.esc(u.fmtDate(t.filmingStart))}</small><div><button class="primary" data-apply="${u.esc(o.project.id)}" data-index="${o.index}">Apply</button><button class="small" data-force-role="${u.esc(o.project.id)}" data-index="${o.index}">Force win</button></div></div><div class="side"><span class="fit ${fitClass(o.fit)}">${o.fit}%</span><br>fit</div></div>`};
  const featured=featuredOpportunities(s,c).recommendations;
- root.innerHTML=`
+ root.innerHTML=`${inPrison(s)?`<div class="notice">You cannot audition from prison. Your release date is ${u.esc(u.fmtDate(s.prison.until))}.</div>`:''}
  ${shoots.map(p=>`<div class="card"><div class="row"><h2>On set: ${u.esc(p.title)}</h2><span class="pill">until ${u.esc(u.fmtDate(projectSchedule(p).filmingEnd))}</span></div><p class="muted">Filming happens automatically. Extra effort here improves your performance.</p><button class="outline" data-onset="rehearse" data-project="${u.esc(p.id)}">Rehearse scenes</button><button class="outline" data-onset="teamwork" data-project="${u.esc(p.id)}">Support the cast</button><button class="outline" data-onset="rest" data-project="${u.esc(p.id)}">Rest between takes</button></div>`).join('')}
  ${apps.length?`<div class="section-title">Your applications</div><div class="list">${apps.map(appRow).join('')}</div>`:''}
  ${featured.length?`<div class="section-title">Picked for you</div><div class="list" id="featured">${featured.map(o=>roleRow(o,true)).join('')}</div>`:''}
@@ -151,13 +154,25 @@ export function renderAssets(root,u){
 
 // ----------------------------------------------------------- activities tab
 const actIcon={gym:'🏋️',run:'🏃',meditate:'🧘',read:'📖',doctor:'🩺',therapy:'💬',spa:'🛁',surgery:'💉',class:'🎭',improv:'🎤',theatre:'🎟️',voice:'🗣️',social:'📱',charity:'🤝',donate:'💝',club:'🪩',concert:'🎸',holiday:'✈️',lottery:'🎰',adopt:'👶'};
+const crimeIcon={shoplift:'🛍️',graffiti:'🎨',pickpocket:'👛',bootleg:'📀',burglary:'🏚️',gta:'🚘',insurance:'📄',bribe:'💵',taxes:'🧾',heist:'🏦'};
+const prisonIcon={yard:'🏋️',library:'📚',drama:'🎭',behave:'🤐',appeal:'⚖️',escape:'🪜'};
+function renderPrison(root,u){
+ const s=u.state,left=Math.max(0,Math.round((Date.parse(s.prison.until)-Date.parse(dateOf(s)))/86400000));
+ root.innerHTML=`<div class="screen-head"><div><h1>Prison</h1><p>Serving time for ${u.esc(s.prison.crime)}. About ${left>60?`${Math.round(left/30.4)} months`:`${left} days`} left. ${Math.round(s.energy??100)} energy.</p></div></div>
+ <div class="list">${prisonActivities.map(a=>{const why=prisonReason(s,a);return `<button class="list-row${why?' disabled':''}" data-prison="${a.id}" ${why?'disabled':''}><span class="emoji">${prisonIcon[a.id]}</span><span class="main"><strong>${u.esc(a.name)}</strong><small>${u.esc(a.blurb)}</small>${why?`<span class="why">${u.esc(why)}</span>`:''}</span><span class="side">${a.cost?`<b>${u.money(a.cost*eraValue(s.year))}</b>`:''}${a.energy?`${a.energy} energy`:''}</span></button>`}).join('')}</div>
+ <p class="muted">Auditions, shopping and outings wait until you are out. Friends and family can still visit: talk to them in People.</p>`;
+ root.querySelectorAll('[data-prison]').forEach(b=>b.onclick=()=>{let out;try{out=prisonActivity(s,b.dataset.prison);u.save()}catch(e){return u.toast(e.message)}u.showResult(out.title,out.body,prisonIcon[b.dataset.prison],u.render)});
+}
 export function renderActivities(root,u){
+ if(inPrison(u.state))return renderPrison(root,u);
  const s=u.state,c=u.catalogue,conditions=conditionsOf(s),groups=[...new Set(activities.map(a=>a.group))];
  const row=a=>{const why=activityReason(s,a),cost=activityCost(s,a);return `<button class="list-row${why?' disabled':''}" data-activity="${a.id}" ${why?'disabled':''}><span class="emoji">${actIcon[a.id]||'•'}</span><span class="main"><strong>${u.esc(a.name)}</strong><small>${u.esc(a.blurb)}</small>${why?`<span class="why">${u.esc(why)}</span>`:''}</span><span class="side">${cost?`<b>${u.money(cost)}</b>`:''}${a.energy?`${a.energy} energy`:''}</span></button>`};
  root.innerHTML=`<div class="screen-head"><div><h1>Activities</h1><p>${Math.round(s.energy??100)} energy left this week. Resting or a new week refills it.</p></div></div>
  ${conditions.length?`<div class="section-title">Your health</div><div class="list">${conditions.map(x=>{const t=conditionTypes[x.type];return `<div class="list-row"><span class="emoji">🤒</span><div class="main"><strong>${u.esc(x.name)}</strong><small>Since ${u.esc(u.fmtDate(x.since))}${x.until?` · should pass by ${u.esc(u.fmtDate(x.until))}`:' · needs treatment'}</small></div><div class="side"><button class="primary" data-treat="${u.esc(x.id)}">Treat · ${u.money(t.cost*eraValue(s.year))}</button></div></div>`}).join('')}</div>`:''}
  <div class="section-title">Practice</div><div class="list">${[['acting','Practise acting','Free, +1 acting'],['drama','Practise drama','+1 drama'],['comedy','Practise comedy','+1 comedy']].map(([k,l,b])=>`<button class="list-row" data-train="${k}"><span class="emoji">${k==='comedy'?'😂':k==='drama'?'🎬':'🎭'}</span><span class="main"><strong>${l}</strong><small>${b}</small></span><span class="side">15 energy</span></button>`).join('')}</div>
- ${groups.map(g=>`<div class="section-title">${u.esc(g)}</div><div class="list">${activities.filter(a=>a.group===g).map(row).join('')}</div>`).join('')}`;
+ ${groups.map(g=>`<div class="section-title">${u.esc(g)}</div><div class="list">${activities.filter(a=>a.group===g).map(row).join('')}</div>`).join('')}
+ <div class="section-title">Crime</div><p class="muted" style="margin:0 2px 6px">Big rewards, real consequences: fines, court and prison, and a record that follows you into casting rooms.${criminalRecord(s).filter(r=>r.convicted).length?` Your record: ${criminalRecord(s).filter(r=>r.convicted).length} conviction(s).`:''}</p><div class="list">${crimes.map(x=>{const why=crimeReason(s,x);return `<button class="list-row${why?' disabled':''}" data-crime="${x.id}" ${why?'disabled':''}><span class="emoji">${crimeIcon[x.id]}</span><span class="main"><strong>${u.esc(x.name)}</strong><small>${u.esc(x.blurb)}</small>${why?`<span class="why">${u.esc(why)}</span>`:''}</span><span class="side">${x.cost?`<b>${u.money(x.cost*eraValue(s.year))}</b>`:''}${x.energy?`${x.energy} energy`:''}</span></button>`}).join('')}</div>`;
+ root.querySelectorAll('[data-crime]').forEach(b=>b.onclick=()=>{let out;try{out=commitCrime(s,c,b.dataset.crime);u.save()}catch(e){return u.toast(e.message)}u.showResult(out.title,out.body,crimeIcon[b.dataset.crime],u.render)});
  root.querySelectorAll('[data-activity]').forEach(b=>b.onclick=async()=>{let out;try{out=doActivity(s,b.dataset.activity);u.save()}catch(e){return u.toast(e.message)}u.showResult(out.title,out.body,actIcon[b.dataset.activity],async()=>{if(out.advanceDays)await u.advanceWeeks(out.advanceDays/7);else u.render()})});
  root.querySelectorAll('[data-treat]').forEach(b=>b.onclick=()=>{let out;try{out=treat(s,b.dataset.treat);u.save()}catch(e){return u.toast(e.message)}u.showResult(out.title,out.body,'🩺',u.render)});
  root.querySelectorAll('[data-train]').forEach(b=>b.onclick=()=>{try{train(s,b.dataset.train);u.save();u.toast(`${b.dataset.train[0].toUpperCase()+b.dataset.train.slice(1)} is now ${s.skills[b.dataset.train]}.`);u.render()}catch(e){u.toast(e.message)}});

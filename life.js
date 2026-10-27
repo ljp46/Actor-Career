@@ -1,9 +1,9 @@
 // v1.7 life simulation: wellbeing, health, ageing, death, legacy, activities,
 // pets and random life events. All events are fictional gameplay.
-import {active,person,uniqueName,die,switchTo,currentDate} from './engine.js?v=16';
-import {bond,personAge,romanceAllowed} from './relationships.js?v=16';
-import {limit,feed,queueEvent,openLifeEvent,dateOf,plusDays,daysBetween,random,eraValue,ensureOverhaul,calendarReason,reserve,fingerprint,assets} from './game-rules.js?v=16';
-import {careerProfile} from './career.js?v=16';
+import {active,person,uniqueName,die,switchTo,currentDate} from './engine.js?v=17';
+import {bond,personAge,romanceAllowed} from './relationships.js?v=17';
+import {limit,feed,queueEvent,openLifeEvent,dateOf,plusDays,daysBetween,random,eraValue,ensureOverhaul,calendarReason,reserve,fingerprint,assets} from './game-rules.js?v=17';
+import {careerProfile} from './career.js?v=17';
 
 export const LIFE_VERSION=1;
 const roll=s=>random(s);
@@ -78,7 +78,7 @@ export function lifeTick(s,catalogue,{days=7}={}){
  if(age<30&&s.health<95)s.health=limit(s.health+.6*weeks,0,100);
  // Happiness drifts towards a target shaped by your life
  const life=ensureOverhaul(s),owned=(s.possessions||[]).filter(p=>p.ownerId===s.activeId),pets=s.pets.filter(p=>p.ownerId===s.activeId&&p.alive);
- const partner=Object.values(s.relationships||{}).find(r=>r.dating);
+ const partner=Object.values(s.relationships||{}).find(r=>r.dating&&!r.affair);
  const target=limit(52+(partner?10+(partner.status==='married'?4:0)-(partner.tension||0)/10:0)+Math.min(10,pets.length*5)+(owned.some(p=>assetKind(p.id)==='home')?5:0)+(life.lifestyle==='luxury'?6:life.lifestyle==='comfortable'?3:0)-(life.debt>0?12:0)-conditionsOf(s).length*6+(s.health<40?-10:0)+Math.min(8,(s.fame||0)/12)+(s.energy<20?-4:0));
  st.happiness=limit(st.happiness+(target-st.happiness)*.06*weeks);
  st.peakFame=Math.max(st.peakFame||0,s.fame||0);
@@ -186,6 +186,7 @@ export const activities=[
 ];
 export function activityReason(s,a){
  const age=ageOf(s);if(s.complete)return 'This life has ended.';
+ if(s.prison&&s.prison.personId===s.activeId&&s.prison.until>dateOf(s))return 'Not possible from prison.';
  if(age<a.minAge)return `Available from age ${a.minAge}.`;
  if(a.minYear&&s.year<a.minYear)return `Not available until ${a.minYear}.`;
  if((s.energy??100)<a.energy)return `Needs ${a.energy} energy.`;
@@ -249,6 +250,7 @@ export function familyActionReason(s,p,kind){
  const r=bond(s,p),age=ageOf(s),a=familyActions[kind];if(!a||!p.alive||s.complete)return 'Unavailable.';
  if(a.energy&&(s.energy??100)<a.energy)return `Needs ${a.energy} energy.`;
  if(a.cost&&s.money<cash(s,a.cost))return `Costs ${fmtCash(cash(s,a.cost))}.`;
+ if(['time','baby'].includes(kind)&&s.prison&&s.prison.personId===s.activeId&&s.prison.until>dateOf(s))return 'Not possible from prison.';
  if(kind==='money'&&!['Parent','Grandparent','Sibling'].includes(p.relative))return 'Only family will lend you money.';
  if(kind==='money'&&r.askedOn&&daysBetween(r.askedOn,dateOf(s))<90)return 'You asked recently.';
  if(kind==='baby'){if(!romanceAllowed(s,p,{adult:true})||!r.dating)return 'Only with an adult partner.';if(!['cohabiting','engaged','married'].includes(r.status))return 'Live together first.';if(age>50&&personAge(s,p)>50)return 'Consider adoption instead.';if(s.pregnancy&&s.pregnancy.personId===s.activeId)return 'A baby is already on the way.'}
@@ -337,7 +339,7 @@ function eventEligible(s,e,ctx){
  if(e.partner){const partner=partnerOf(s);if(!partner)return false;const r=bond(s,partner);if(!romanceAllowed(s,partner,{adult:true}))return false;if(e.partner==='dating'&&!['committed','cohabiting'].includes(r.status))return false;if(e.partner==='living'&&!['cohabiting','engaged','married'].includes(r.status))return false;if(e.partner==='married'&&r.status!=='married')return false}
  return true;
 }
-export function partnerOf(s){const entry=Object.entries(s.relationships||{}).find(([,r])=>r.dating);return entry&&s.people.find(p=>p.name===entry[0]&&p.alive)}
+export function partnerOf(s){const entry=Object.entries(s.relationships||{}).find(([,r])=>r.dating&&!r.affair);return entry&&s.people.find(p=>p.name===entry[0]&&p.alive)}
 function randomEvent(s,catalogue){
  const filming=(s.filmography||[]).some(f=>f.personId===s.activeId&&f.status==='filming');
  const pool=eventPool.filter(e=>eventEligible(s,e,{filming}));if(!pool.length)return;
