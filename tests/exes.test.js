@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCareer,person,bookRole,projectSchedule,connect} from '../engine.js?v=17';
-import {makeOffer,acceptCareerOffer,conflictDetails,conflictText} from '../career.js?v=17';
+import {makeOffer,acceptCareerOffer,conflictDetails,conflictText,leaveSeries,withdrawBooking} from '../career.js?v=17';
 import {migrateOverhaul,socialProfile,resolveLifeEvent,overhaulTick} from '../overhaul.js?v=17';
 import {bond,recordBreakup,relationshipStatus} from '../relationships.js?v=17';
 import {ensureLife} from '../life.js?v=17';
@@ -35,3 +35,9 @@ test('payback: say yes, then dump them',()=>{const s=fixture([],'1996-01-01','20
 test('ex profile actions: closure, late-night texts and blocking',()=>{const s=fixture([],'1996-01-01','2020-01-01'),p=ex(s);const h=exHistory(s,p);assert.match(h.line,/ended it/);exAction(s,p,'block');assert.ok(bond(s,p).blocked);assert.throws(()=>exAction(s,p,'latenight'),/blocked/);exAction(s,p,'block');for(let i=0;i<12&&(bond(s,p).closure||0)<90;i++){s.energy=100;exAction(s,p,'closure')}assert.ok(bond(s,p).closure>=90);assert.throws(()=>exAction(s,p,'closure'),/already have closure/)});
 
 test('working with an ex on set triggers an awkward popup',()=>{const s=fixture([],'1996-01-01','2020-01-01'),p=ex(s);let e=null;for(let i=0;i<30&&!e;i++){exTick(s,[],7,{workingNames:[p.name]});e=openLifeEvent(s);if(e&&e.data.kind!=='set'){s.lifeEvents=[];e=null;s.lifeProfiles.self.lastExEvent=null}}assert.ok(e);assert.equal(e.title,'Awkward on set')});
+
+test('leaving a show cancels its already-booked next season, so it no longer clashes',()=>{const s2=show(2,'2020-03-01','2020-06-01',{castingStartDate:'2019-06-01'}),other=show(9,'2020-04-01','2020-07-01',{id:'stranger',title:'Stranger Show · Season 3',seriesId:'stranger',castingStartDate:'2019-06-01'}),s=fixture([s2,other]);jump(s,'2019-09-01');const offer=makeOffer(s,s2,0,{source:'studio'});acceptCareerOffer(s,[s2,other],offer.id,{});const c=s.tvCareers.find(c=>c.seriesId==='big');assert.equal(conflictDetails(s,[s2,other],other).length,1);assert.equal(conflictDetails(s,[s2,other],other)[0].droppable,true);leaveSeries(s,c.id);assert.equal(s.filmography.find(f=>f.projectId===s2.id).status,'withdrawn');assert.equal(conflictDetails(s,[s2,other],other).length,0);const ret=makeOffer(s,other,0,{source:'studio'});assert.doesNotThrow(()=>acceptCareerOffer(s,[s2,other],ret.id,{}))});
+
+test('you can drop out of a booked role before filming, at a reputation cost',()=>{const a=show(1,'2020-03-01','2020-06-01',{id:'film-a',title:'Film A',kind:'Film',seriesId:undefined}),s=fixture([a]);jump(s,'2019-09-01');bookRole(s,[a],a,a.roles[0],0);const before=s.careerProfiles.self.reputation;withdrawBooking(s,a.id);assert.equal(s.filmography[0].status,'withdrawn');assert.ok(s.careerProfiles.self.reputation<before);jump(s,'2020-04-01');const b=show(1,'2020-03-01','2020-06-01',{id:'film-b',title:'Film B',kind:'Film',seriesId:undefined});bookRole(s,[a,b],b,b.roles[0],0);s.filmography.at(-1).status='filming';assert.throws(()=>withdrawBooking(s,'film-b'),/before filming/)});
+
+test('older saves: a season left booked after leaving its show is cleaned up on load',async()=>{const {ensureCareer}=await import('../career.js?v=17');const s2=show(2,'2020-03-01','2020-06-01'),s=fixture([s2]);jump(s,'2019-09-01');const offer=makeOffer(s,s2,0,{source:'studio'});acceptCareerOffer(s,[s2],offer.id,{});const c=s.tvCareers.find(c=>c.seriesId==='big');c.status='left';assert.equal(s.filmography[0].status,'booked');ensureCareer(s);assert.equal(s.filmography[0].status,'withdrawn')});
