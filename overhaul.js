@@ -84,7 +84,7 @@ export function socialProfile(s,p){
 export function socialAction(s,catalogue,p,kind){
  const traits=socialProfile(s,p),r=bond(s,p),date=currentDate(s),adult=romanceAllowed(s,p,{adult:true});
  if(['holiday','move-in','engage','marry'].includes(kind)&&(!adult||!r.dating))throw Error('These decisions require an adult relationship.');
- if(['flirt','date','hookup','reconcile'].includes(kind)&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating&&!adult)throw Error(`${p.name} is already ${p.socialLife.status}.`);
+ if(['date','hookup','reconcile'].includes(kind)&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating&&!adult)throw Error(`${p.name} is with ${p.socialLife.partnerName||'someone'}. Ask them to leave first.`);
  if(inPrison(s)&&['holiday','move-in','marry','date','hookup','outing','walk'].includes(kind))throw Error('You are in prison. Conversations happen during visits.');
  if(kind==='holiday'){
   const reason=calendarReason(s,date,plusDays(date,7));if(reason)throw Error(reason);if(p.busyUntil>date)throw Error('They are busy with work.');const cost=Math.round(1800*eraValue(s.year));if(s.money<cost)throw Error(`A holiday costs $${cost}.`);
