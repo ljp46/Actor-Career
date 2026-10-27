@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createCareer,person,available,bookRole} from '../engine.js?v=17';
+import {migrateOverhaul,socialAction,socialProfile,resolveLifeEvent,applyRole,buyAsset} from '../overhaul.js?v=17';
+import {bond,interactionReason,relationshipStatus} from '../relationships.js?v=17';
+import {ensureLife} from '../life.js?v=17';
+import {openLifeEvent} from '../game-rules.js?v=17';
+import {viceAction,viceReason,noteCheating,viceTick,crimes,crimeReason,commitCrime,jail,inPrison,prisonActivity,prisonActivities,criminalRecord,exclusivePartners,isTaken,recordPenalty} from '../vice.js?v=17';
+
+const production=(id='one')=>({id,title:id,year:2020,kind:'Film',director:'Director',genre:'Drama',releaseDate:'2020-12-01',filmingStartDate:'2020-06-01',filmingEndDate:'2020-08-01',castingStartDate:'2020-01-01',voteCount:5000,popularity:50,baselineRating:8,roles:[{character:'Alex Reed',actor:'Historical Star',birthYear:1996,gender:'male',ageMin:18,ageMax:30,characterAge:24}]});
+function fixture(projects=[],birthday='1996-01-01'){const s=createCareer({name:'Test Actor',birthday,startDate:'2020-01-01',gender:'male'},projects);migrateOverhaul(s,projects);ensureLife(s);s.money=500000;s.skills={acting:90,drama:90,comedy:90};s.lifeEvents=[];return s}
+function jump(s,date){s.date=date;s.year=+date.slice(0,4);s.month=+date.slice(5,7)}
+function taken(s,name='Star Person',birthYear=1996){const p=person(s,name,'Actor',birthYear,'','female');socialProfile(s,p);p.socialLife={status:'dating',partnerName:'Fictional Partner',lastChange:'2019-01-01'};return p}
+function partner(s,status='married'){const p=person(s,'Main Partner','Teacher',1995,'','female');socialProfile(s,p);const r=bond(s,p);r.dating=true;r.status=status;r.trust=60;r.commitment=60;p.socialLife={status,partnerId:'self',partnerName:'Test Actor'};return p}
+const answer=(s,c,id)=>{const e=openLifeEvent(s);assert.ok(e,'an event is open');return resolveLifeEvent(s,c,e.id,id)};
+
+test('adults can flirt with and date someone taken, as a secret affair that leaves their partner in place',()=>{const s=fixture(),p=taken(s);const r=bond(s,p);r.chemistry=90;r.friendship=90;assert.equal(interactionReason(s,p,'flirt'),'');for(let i=0;i<40&&!r.dating;i++){s.energy=100;r.spaceUntil=null;socialAction(s,[],p,'date')}assert.ok(r.dating);assert.equal(r.affair,true);assert.equal(r.status,'affair');assert.equal(relationshipStatus(s,p),'Secret affair');assert.equal(p.socialLife.partnerName,'Fictional Partner');socialProfile(s,p);assert.equal(p.socialLife.partnerName,'Fictional Partner');assert.ok(r.exposure>0)});
+
+test('teenagers still cannot pursue someone who is taken',()=>{const s=fixture([],'2005-01-01'),p=taken(s,'Teen Taken',2005);assert.match(interactionReason(s,p,'flirt'),/already/);assert.match(viceReason(s,p,'steal'),/two adults/)});
+
+test('asking someone to leave their partner can work, and fails gracefully when it does not',()=>{let won=false,lost=false;for(let seed=1;seed<60&&!(won&&lost);seed++){const s=fixture();s.rng=seed*7919;const p=taken(s);const r=bond(s,p);r.chemistry=70;r.friendship=60;const out=viceAction(s,[],p,'steal');if(out.ok){won=true;assert.equal(p.socialLife.partnerId,'self');assert.equal(r.dating,true);assert.equal(r.affair,false);assert.equal(p.formerPartner,'Fictional Partner')}else{lost=true;assert.ok(r.spaceUntil)}}assert.ok(won&&lost)});
+
+test('meddling can split a couple up',()=>{let split=false;for(let seed=1;seed<40&&!split;seed++){const s=fixture();s.rng=seed*104729;const p=taken(s);bond(s,p).friendship=60;viceAction(s,[],p,'sabotage');if(p.socialLife.status==='single')split=true}assert.ok(split)});
+
+test('cheating on your spouse builds suspicion that can blow up into a popup',()=>{const s=fixture(),wife=partner(s),other=taken(s,'Other Lover');noteCheating(s,other,'hookup');noteCheating(s,other,'date');assert.ok(bond(s,wife).suspicion>=40);let caught=null;for(let i=0;i<200&&!caught;i++){viceTick(s,[],7);caught=openLifeEvent(s)?.data?.kind==='caught'?openLifeEvent(s):null;if(openLifeEvent(s)&&!caught)s.lifeEvents=[]}assert.ok(caught,'eventually caught');assert.match(caught.title,/found out/);assert.ok(caught.options.some(o=>o.id==='leave'))});
+
+test('getting caught by a spouse and denying it with screenshots ends in divorce and a settlement',()=>{const s=fixture(),wife=partner(s);bond(s,wife).suspicion=90;bond(s,wife).cheatedWith='Someone';s.money=100000;for(let i=0;i<100&&!openLifeEvent(s);i++)viceTick(s,[],7);answer(s,[],'deny');assert.equal(bond(s,wife).status,'divorced');assert.equal(s.money,60000)});
+
+test('leaving your partner for your affair makes the affair official',()=>{const s=fixture(),wife=partner(s,'committed'),lover=person(s,'Single Lover','Writer',1996,'','female');socialProfile(s,lover);const r=bond(s,lover);r.dating=true;r.affair=true;r.status='affair';bond(s,wife).suspicion=95;bond(s,wife).cheatedWith='Single Lover';for(let i=0;i<100&&!openLifeEvent(s);i++)viceTick(s,[],7);answer(s,[],'leave');assert.equal(bond(s,wife).dating,false);assert.equal(r.affair,false);assert.equal(r.status,'dating');assert.equal(lover.socialLife.partnerId,'self');assert.equal(exclusivePartners(s).length,0)});
+
+test('your partner can cheat on you too',()=>{const s=fixture(),wife=partner(s);bond(s,wife).tension=100;bond(s,wife).affection=10;wife.lifePersonality.intention='casual';let e=null;for(let i=0;i<600&&!e;i++){viceTick(s,[],7);e=openLifeEvent(s)}assert.ok(e);assert.equal(e.data.kind,'their-affair');resolveLifeEvent(s,[],e.id,'leave');assert.equal(bond(s,wife).status,'divorced')});
+
+test('crime menu has age gates and requirements',()=>{const kid=fixture([],'2005-01-01');assert.match(crimeReason(kid,crimes.find(c=>c.id==='heist')),/age 21/);assert.match(crimeReason(fixture([],'2010-01-01'),crimes.find(c=>c.id==='shoplift')),/age 14/);assert.equal(crimeReason(kid,crimes.find(c=>c.id==='shoplift')),'');const s=fixture();s.money=10;assert.match(crimeReason(s,crimes.find(c=>c.id==='taxes')),/50,000/);assert.match(crimeReason(s,crimes.find(c=>c.id==='bootleg')),/released film/)});
+
+test('teens get cautions, then juvenile detention on a third strike',()=>{const s=fixture([],'2004-01-01');let tries=0;while(criminalRecord(s).length<3&&tries++<400){s.energy=100;commitCrime(s,[],'pickpocket')}assert.ok(inPrison(s));assert.equal(openLifeEvent(s),undefined,'no adult court for juveniles')});
+
+test('a serious crime leads to arrest, court and prison that blocks auditions and loses bookings',()=>{const p=production(),s=fixture([p]);bookRole(s,[p],p,p.roles[0],0);let tries=0;while(!openLifeEvent(s)&&tries++<300){s.energy=100;commitCrime(s,[p],'heist');s.lifeEvents=s.lifeEvents.filter(e=>e.type==='crime')}const e=openLifeEvent(s);assert.equal(e.data.kind,'arrest');const out=resolveLifeEvent(s,[p],e.id,'guilty');assert.match(out,/Guilty/);assert.ok(inPrison(s));assert.equal(s.filmography[0].status,'withdrawn');assert.equal(available(s,[p]).length,0);assert.throws(()=>applyRole(s,[p],p,0),/prison/);assert.throws(()=>buyAsset(s,'studio'),/prison/);assert.ok(recordPenalty(s)>0)});
+
+test('prison activities shorten the sentence and release eventually comes as a popup',()=>{const s=fixture();jail(s,[],6,'burglary');const before=s.prison.until;s.energy=100;prisonActivity(s,'behave');assert.ok(s.prison.until<before);jump(s,s.prison.until);viceTick(s,[],7);assert.equal(inPrison(s),false);assert.match(openLifeEvent(s).title,/free/)});
+
+test('bribing a casting director can land an offer',()=>{const ps=[production('A'),production('B')],s=fixture(ps);let got=false;for(let i=0;i<40&&!got;i++){s.energy=100;s.lifeEvents=[];s.money=1e6;if(inPrison(s)){s.prison=null}const out=commitCrime(s,ps,'bribe');if(/envelope worked/.test(out.title))got=true}assert.ok(got);assert.ok(s.roleOffers.some(o=>o.status==='offered'))});

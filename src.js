@@ -1,14 +1,15 @@
-import {SAVE_KEY,createCareer,ageAt,advance,switchTo,currentDate,projectSchedule,careerStartDate,applyCheat,normaliseGender} from './engine.js?v=16';
-import {ensureCareer,attachFranchises,pendingOffers,pendingAuditions,careerTick} from './career.js?v=16';
-import {readCatalogueResponse,mergeCatalogue} from './catalogue.js?v=16';
-import {attachSeasons,migrateSeriesCareers,continuityTick,materializeReturns} from './continuity.js?v=16';
-import {ensureRelationships} from './relationships.js?v=16';
-import {renderRelationships} from './relationships-ui.js?v=16';
-import {migrateOverhaul,overhaulTick,nextScheduledDate,resolveLifeEvent,guestEligible} from './overhaul.js?v=16';
-import {ensureOverhaul,openLifeEvent,plusDays,daysBetween,syncCalendar,calendarReason} from './game-rules.js?v=16';
-import {ensureLife,weeklyLife,conditionsOf} from './life.js?v=16';
-import {spinoffTick} from './spinoffs.js?v=16';
-import {renderTopbar,renderDock,renderLife,renderCareer,setCareerSeg,renderAssets,renderActivities,renderLegacy,attentionCount} from './ui-life.js?v=16';
+import {SAVE_KEY,createCareer,ageAt,advance,switchTo,currentDate,projectSchedule,careerStartDate,applyCheat,normaliseGender} from './engine.js?v=17';
+import {ensureCareer,attachFranchises,pendingOffers,pendingAuditions,careerTick} from './career.js?v=17';
+import {readCatalogueResponse,mergeCatalogue} from './catalogue.js?v=17';
+import {attachSeasons,migrateSeriesCareers,continuityTick,materializeReturns} from './continuity.js?v=17';
+import {ensureRelationships} from './relationships.js?v=17';
+import {renderRelationships} from './relationships-ui.js?v=17';
+import {migrateOverhaul,overhaulTick,nextScheduledDate,resolveLifeEvent,guestEligible} from './overhaul.js?v=17';
+import {ensureOverhaul,openLifeEvent,plusDays,daysBetween,syncCalendar,calendarReason} from './game-rules.js?v=17';
+import {ensureLife,weeklyLife,conditionsOf} from './life.js?v=17';
+import {spinoffTick} from './spinoffs.js?v=17';
+import {viceTick} from './vice.js?v=17';
+import {renderTopbar,renderDock,renderLife,renderCareer,setCareerSeg,renderAssets,renderActivities,renderLegacy,attentionCount} from './ui-life.js?v=17';
 const $=s=>document.querySelector(s),screen=$('#screen'),nav=$('#nav');let catalogue=[],state=null,tab='life',yearIndex=new Set(),loadedYears=new Set(),opportunityIndex={},dbMeta={},worldQuery='',worldPage=0,auditionQuery='',auditionKind='',auditionPageNumber=0;
 let franchiseData={collections:{},projectCollections:{},ratings:{}};
 let seasonIndex={shows:{}},seasonShows={},continuityOverrides={exits:[]},filmographyIndex={years:[],shows:{}};
@@ -123,8 +124,8 @@ function showResult(title,body,icon='',after=null){
  document.body.append(e);const close=()=>{e.remove();if(after)after();else render()};
  e.querySelector('[data-ok]').onclick=close;e.addEventListener('click',x=>{if(x.target===e)close()});e.querySelector('[data-ok]').focus();
 }
-const eventIcon={casting:'🎬',offer:'📜',release:'🎞️','award-invitation':'🏆','award-result':'🏆',work:'🎥',publicity:'📺',rumour:'📰',relationship:'💞',friendship:'🤝',rivalry:'⚔️',recast:'🔁',budget:'💸',life:'✨',health:'🩺',family:'👪',legacy:'🕯️'};
-const eventKicker={casting:'Casting',offer:'An offer',release:'Release',  'award-invitation':'Awards','award-result':'Awards',work:'On set',publicity:'Publicity',rumour:'Gossip',relationship:'Love life',friendship:'Friends',rivalry:'Rivalry',recast:'Casting',budget:'Money',life:'Life',health:'Health',family:'Family',legacy:'The end'};
+const eventIcon={crime:'🚨',affair:'💔',casting:'🎬',offer:'📜',release:'🎞️','award-invitation':'🏆','award-result':'🏆',work:'🎥',publicity:'📺',rumour:'📰',relationship:'💞',friendship:'🤝',rivalry:'⚔️',recast:'🔁',budget:'💸',life:'✨',health:'🩺',family:'👪',legacy:'🕯️'};
+const eventKicker={crime:'Crime',affair:'Love life',casting:'Casting',offer:'An offer',release:'Release',  'award-invitation':'Awards','award-result':'Awards',work:'On set',publicity:'Publicity',rumour:'Gossip',relationship:'Love life',friendship:'Friends',rivalry:'Rivalry',recast:'Casting',budget:'Money',life:'Life',health:'Health',family:'Family',legacy:'The end'};
 function presentEventSheet(){
  const s=state,e=s&&openLifeEvent(s),existing=document.querySelector('.life-event-modal');
  if(document.querySelector('.result-modal'))return;
@@ -171,13 +172,13 @@ function opportunityMarkup(birthday,gender,startDate){
 function cheats(){
  if(!state)return toast('Start a life first.');
  const contacts=state.people.filter(p=>p.id!==state.activeId&&p.alive),castmates=contacts.filter(p=>p.occupation==='Actor'&&state.relationships[p.name]).map(p=>p.name);
- const m=modal(`<h2>Cheats</h2><p class="muted">Changes save immediately.</p><div class="section-title">You</div><div><button class="secondary" data-cheat="acting">Max acting</button><button class="secondary" data-cheat="drama">Max drama</button><button class="secondary" data-cheat="comedy">Max comedy</button><button class="secondary" data-life-cheat="happiness">Max happiness</button><button class="secondary" data-life-cheat="health">Max health</button><button class="secondary" data-life-cheat="looks">Max looks</button><button class="secondary" data-life-cheat="cure">Cure everything</button><button class="secondary" data-life-cheat="money">+$100,000</button><button class="secondary" data-life-cheat="million">+$1,000,000</button><button class="secondary" data-life-cheat="fame">+20 fame</button><button class="secondary" data-life-cheat="energy">Refill energy</button></div><div class="section-title">Relationships</div><select id="cheatPerson" aria-label="Relationship target"><option value="__castmates__">All known castmates (${castmates.length})</option>${contacts.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.relative?` · ${esc(p.relative)}`:''}</option>`).join('')}</select><div><button class="secondary" data-cheat="friendship">Max friendship</button><button class="secondary" data-cheat="respect">Max respect</button><button class="secondary" data-cheat="chemistry">Max chemistry</button></div><label><input type="checkbox" id="allowRecasting" ${state.allowRecasting?'checked':''}>Allow recasting established characters</label><p class="muted">Romantic chemistry only applies between adults or close-age teenagers, never relatives, and never starts a relationship by itself.</p><p class="notice" id="cheatResult" aria-live="polite">Pick a cheat.</p>`);
+ const m=modal(`<h2>Cheats</h2><p class="muted">Changes save immediately.</p><div class="section-title">You</div><div><button class="secondary" data-cheat="acting">Max acting</button><button class="secondary" data-cheat="drama">Max drama</button><button class="secondary" data-cheat="comedy">Max comedy</button><button class="secondary" data-life-cheat="happiness">Max happiness</button><button class="secondary" data-life-cheat="health">Max health</button><button class="secondary" data-life-cheat="looks">Max looks</button><button class="secondary" data-life-cheat="cure">Cure everything</button><button class="secondary" data-life-cheat="money">+$100,000</button><button class="secondary" data-life-cheat="million">+$1,000,000</button><button class="secondary" data-life-cheat="fame">+20 fame</button><button class="secondary" data-life-cheat="energy">Refill energy</button><button class="secondary" data-life-cheat="free">Get out of prison</button><button class="secondary" data-life-cheat="record">Clear criminal record</button></div><div class="section-title">Relationships</div><select id="cheatPerson" aria-label="Relationship target"><option value="__castmates__">All known castmates (${castmates.length})</option>${contacts.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.relative?` · ${esc(p.relative)}`:''}</option>`).join('')}</select><div><button class="secondary" data-cheat="friendship">Max friendship</button><button class="secondary" data-cheat="respect">Max respect</button><button class="secondary" data-cheat="chemistry">Max chemistry</button></div><label><input type="checkbox" id="allowRecasting" ${state.allowRecasting?'checked':''}>Allow recasting established characters</label><p class="muted">Romantic chemistry only applies between adults or close-age teenagers, never relatives, and never starts a relationship by itself.</p><p class="notice" id="cheatResult" aria-live="polite">Pick a cheat.</p>`);
  m.querySelector('#allowRecasting').onchange=e=>{state.allowRecasting=e.target.checked;save();render()};
- m.querySelectorAll('[data-life-cheat]').forEach(b=>b.onclick=()=>{const k=b.dataset.lifeCheat,st=ensureLife(state);if(k==='happiness')st.happiness=100;if(k==='looks')st.looks=100;if(k==='health')state.health=100;if(k==='cure')for(const c of conditionsOf(state))c.status='recovered';if(k==='money')state.money+=100000;if(k==='million')state.money+=1000000;if(k==='fame')state.fame=Math.min(100,state.fame+20);if(k==='energy')state.energy=100;save();render();m.querySelector('#cheatResult').textContent='Done.'});
+ m.querySelectorAll('[data-life-cheat]').forEach(b=>b.onclick=()=>{const k=b.dataset.lifeCheat,st=ensureLife(state);if(k==='happiness')st.happiness=100;if(k==='looks')st.looks=100;if(k==='health')state.health=100;if(k==='cure')for(const c of conditionsOf(state))c.status='recovered';if(k==='money')state.money+=100000;if(k==='million')state.money+=1000000;if(k==='fame')state.fame=Math.min(100,state.fame+20);if(k==='energy')state.energy=100;if(k==='free'){state.prison=null;state.wanted=null}if(k==='record'&&state.records)state.records[state.activeId]=[];save();render();m.querySelector('#cheatResult').textContent='Done.'});
  m.querySelectorAll('[data-cheat]').forEach(b=>b.onclick=()=>{const target=m.querySelector('#cheatPerson').value,names=target==='__castmates__'?castmates:contacts.filter(p=>p.id===target).map(p=>p.name);try{const changed=applyCheat(state,b.dataset.cheat,names);save();render();m.querySelector('#cheatResult').textContent=['acting','drama','comedy'].includes(b.dataset.cheat)?`${b.dataset.cheat} is now 100.`:changed?`Updated ${changed} ${changed===1?'relationship':'relationships'}${b.dataset.cheat==='chemistry'?' · romantic chemistry is now 100':''}.`:b.dataset.cheat==='chemistry'?'No eligible matches selected. Chemistry needs two adults, or close-age teenagers, and never relatives.':'Nobody eligible was selected.'}catch(e){toast(e.message)}});
 }
 function openMenu(){
- const m=modal(`<h2>Second Take</h2><p class="muted">Version 1.7 · your save lives on this device. Export it now and then as a backup.</p><div class="sheet-actions"><button class="secondary" id="openLegacy">Family legacy</button><button class="secondary" id="openCheats">Cheats</button><button class="secondary" id="exportSave">Export save</button><label for="importSave" style="margin:4px 0 0">Import a save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="danger" id="resetSave">Start a new life</button></div><p class="muted" style="margin-top:14px">${esc(databaseStatus())} Changed castings, relationships and events are fictional. An independent fan project, not affiliated with any studio. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`);
+ const m=modal(`<h2>Second Take</h2><p class="muted">Version 1.8 · your save lives on this device. Export it now and then as a backup.</p><div class="sheet-actions"><button class="secondary" id="openLegacy">Family legacy</button><button class="secondary" id="openCheats">Cheats</button><button class="secondary" id="exportSave">Export save</button><label for="importSave" style="margin:4px 0 0">Import a save (.json)</label><input id="importSave" type="file" accept="application/json,.json"><button class="danger" id="resetSave">Start a new life</button></div><p class="muted" style="margin-top:14px">${esc(databaseStatus())} Changed castings, relationships and events are fictional. An independent fan project, not affiliated with any studio. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`);
  m.querySelector('#openLegacy').onclick=()=>{m.remove();navigate('legacy')};
  m.querySelector('#openCheats').onclick=()=>{m.remove();cheats()};
  m.querySelector('#exportSave').onclick=()=>{if(!state)return toast('Start a life first.');const url=URL.createObjectURL(new Blob([JSON.stringify(state)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=`second-take-${state.year}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)};
@@ -204,7 +205,7 @@ async function advanceWeeks(count,{resume=false}={}){
    advance(state,catalogue,{days});careerTick(state,catalogue,franchiseData);
    continuityTick(state,catalogue,{shows:seasonShows,franchises:franchiseData,overrides:continuityOverrides});
    overhaulTick(state,catalogue);
-   if(!state.complete){spinoffTick(state,catalogue);weeklyLife(state,catalogue,days)}
+   if(!state.complete){spinoffTick(state,catalogue);weeklyLife(state,catalogue,days);if(!state.complete)viceTick(state,catalogue,days)}
    remaining-=days;
    if(state.continuityRequests.some(r=>![...catalogue,...state.projects].some(p=>p.id===r.projectId)&&r.year<=state.year+2))await loadCareerYears(state);
    if(openLifeEvent(state)){state.advanceRemaining=Math.max(0,remaining);break}
@@ -231,16 +232,16 @@ function render(){
 }
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b||!state)return;if(b.id==='ageButton'){if(state.complete){navigate('life');return}const was=tab;tab='life';if(was!=='life'){render();window.scrollTo(0,0)}advanceWeeks(4);return}navigate(b.dataset.tab,{fromNav:true})});
 async function init(){try{
- const response=await fetch('./data/sample.json?v=16');if(!response.ok)throw Error('Catalogue failed to load.');const sample=(await response.json()).projects;
- const manifest=await fetch('./data/years/index.json?v=16');if(!manifest.ok)throw Error('Historical database index could not load. Please try again online.');dbMeta=await manifest.json();yearIndex=new Set(dbMeta.years||[]);opportunityIndex=dbMeta.opportunities||{};
- franchiseData=await readCatalogueResponse(await fetch('./data/franchises.json.gz?v=16'),true);
- seasonIndex=await readCatalogueResponse(await fetch('./data/tv-seasons/index.json.gz?v=16'),true);
- const filmographies=await fetch('./data/filmographies/index.json?v=16');if(!filmographies.ok)throw Error('Permanent filmographies could not load. Please try again online.');filmographyIndex=await filmographies.json();
+ const response=await fetch('./data/sample.json?v=17');if(!response.ok)throw Error('Catalogue failed to load.');const sample=(await response.json()).projects;
+ const manifest=await fetch('./data/years/index.json?v=17');if(!manifest.ok)throw Error('Historical database index could not load. Please try again online.');dbMeta=await manifest.json();yearIndex=new Set(dbMeta.years||[]);opportunityIndex=dbMeta.opportunities||{};
+ franchiseData=await readCatalogueResponse(await fetch('./data/franchises.json.gz?v=17'),true);
+ seasonIndex=await readCatalogueResponse(await fetch('./data/tv-seasons/index.json.gz?v=17'),true);
+ const filmographies=await fetch('./data/filmographies/index.json?v=17');if(!filmographies.ok)throw Error('Permanent filmographies could not load. Please try again online.');filmographyIndex=await filmographies.json();
  seasonIndex={...seasonIndex,shows:{...seasonIndex.shows,...filmographyIndex.shows}};
- const overrides=await fetch('./data/continuity-overrides.json?v=16');if(!overrides.ok)throw Error('Character continuity could not load.');continuityOverrides=await overrides.json();
+ const overrides=await fetch('./data/continuity-overrides.json?v=17');if(!overrides.ok)throw Error('Character continuity could not load.');continuityOverrides=await overrides.json();
  catalogue=attachFranchises(sample.filter(p=>!yearIndex.has(p.year)),franchiseData);
  const raw=localStorage.getItem(SAVE_KEY);
  if(raw){const loaded=JSON.parse(raw);if(loaded.version===1&&Array.isArray(loaded.people)){state=loaded;state.date??=currentDate(state);state.directors??={};state.possessions??=[];state.people.forEach(p=>p.gender??='unspecified');await loadCareerYears(state);migrateOverhaul(state,catalogue);ensureLife(state);save()}}
- render();if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=16').catch(()=>{})
+ render();if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js?v=17').catch(()=>{})
 }catch(e){screen.innerHTML=`<div class="card"><h2>Could not load the game</h2><p>${esc(e.message)}</p><p class="muted">Open it from GitHub Pages or a local web server rather than as a file.</p></div>`}}
 init();

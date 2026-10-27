@@ -15,15 +15,18 @@ export function ensureRelationships(s){
 export function personality(p){if(!p.socialPersonality){let h=0;for(const c of p.name)h=(Math.imul(h,31)+c.charCodeAt(0))>>>0;p.socialPersonality={style:['Thoughtful','Adventurous','Reserved','Ambitious'][h%4],preference:['walk','outing','chat','career'][Math.floor(h/4)%4],commitment:35+h%61,privacy:h%3!==0}}return p.socialPersonality}
 export function bond(s,p){ensureRelationships(s);const r=s.relationships[p.name]??={friendship:p.relative?65:0,respect:0,chemistry:0,dating:false};r.memories??=[];r.commitment??=r.dating?35:0;r.status??=r.dating?'dating':'acquaintance';r.public??=false;r.tension??=0;personality(p);return r}
 function memory(s,p,r,title,body,log=true){r.memories.unshift({date:date(s),title,body});r.memories.length=Math.min(r.memories.length,32);if(log)s.timeline.unshift({year:s.year,month:s.month,date:date(s),title:`${title} · ${p.name}`,body});s.timeline.length=Math.min(s.timeline.length,250)}
-export function relationshipStatus(s,p){const r=bond(s,p);return p.relative||(!p.alive?'Remembered':r.dating?(({committed:'Partners',cohabiting:'Living together',engaged:'Engaged',married:'Married'}[r.status]||'Dating')):r.status==='ex'?'Former partner':p.rivalry>=35?'Rival':r.friendship>=70?'Close friend':r.friendship>=30?'Friend':'Acquaintance')}
+export function relationshipStatus(s,p){const r=bond(s,p);return p.relative||(!p.alive?'Remembered':r.dating?(({affair:'Secret affair',committed:'Partners',cohabiting:'Living together',engaged:'Engaged',married:'Married'}[r.status]||'Dating')):r.status==='ex'?'Former partner':p.rivalry>=35?'Rival':r.friendship>=70?'Close friend':r.friendship>=30?'Friend':'Acquaintance')}
 export function interactionReason(s,p,kind){
  if(!p?.alive||p.id===s.activeId||s.complete)return 'This person is unavailable.';
  const r=bond(s,p);
- if(s.overhaulVersion&&['flirt','date','hookup','reconcile'].includes(kind)&&p.socialLife&&p.socialLife.status!=='single'&&!r.dating)return 'They are already in a relationship.';
+ const adultPair=romanceAllowed(s,p,{adult:true});
+ if(s.prison&&s.prison.personId===s.activeId&&s.prison.until>date(s)&&['walk','outing','date','hookup'].includes(kind))return 'You are in prison. Conversations happen during visits.';
+ if(s.overhaulVersion&&['flirt','date','hookup','reconcile'].includes(kind)&&p.socialLife&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating&&!adultPair)return 'They are already in a relationship.';
+ if(kind==='commit'&&p.socialLife&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId)return `They are still with ${p.socialLife.partnerName||'someone'}. Ask them to leave first.`;
  if(['flirt','date','commit','reconcile'].includes(kind)&&!romanceAllowed(s,p))return 'Dating starts at 13, with close-age matches for teenagers.';
  if(kind==='hookup'&&!romanceAllowed(s,p,{adult:true}))return 'Private nights are available only between unrelated adults.';
  if(['flirt','date','hookup','commit','reconcile'].includes(kind)&&r.spaceUntil>date(s))return 'They asked for space. You can still have an ordinary conversation.';
- if(['date','hookup','reconcile','commit'].includes(kind)&&Object.entries(s.relationships).some(([name,b])=>name!==p.name&&b.dating&&['committed','cohabiting','engaged','married'].includes(b.status)))return 'You are in an exclusive relationship. End it before pursuing someone else.';
+ if((kind==='commit'||!adultPair&&['date','hookup','reconcile'].includes(kind))&&Object.entries(s.relationships).some(([name,b])=>name!==p.name&&b.dating&&!b.affair&&['committed','cohabiting','engaged','married'].includes(b.status)))return 'You are in an exclusive relationship. End it before committing to someone else.';
  if(['date','outing','walk','hookup'].includes(kind)&&p.busyUntil>date(s))return 'They are busy with work. Try a conversation or come back after their shoot.';
  if(kind==='commit'&&!r.dating)return 'Start dating before discussing commitment.';
  if(kind==='commit'&&['committed','cohabiting','engaged','married'].includes(r.status))return 'You have already agreed to be exclusive.';
@@ -44,14 +47,15 @@ export function interact(s,p,kind,{onSet=false}={}){
  const gain=r.chats<3?(kind==='set'?9:6):r.chats<7?2:0;
  if(small)r.chats++;
  if(['date','hookup','commit','reconcile','flirt'].includes(kind)){
-  const chance=kind==='flirt'?clamp((r.friendship+35)/120,.2,.85):kind==='commit'?clamp((r.friendship+r.commitment+traits.commitment-r.tension)/240,.1,.9):clamp((r.chemistry+r.friendship+25-r.tension)/160,.15,.9);
+  const taken=Boolean(p.socialLife&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating);
+  const chance=(kind==='flirt'?clamp((r.friendship+35)/120,.2,.85):kind==='commit'?clamp((r.friendship+r.commitment+traits.commitment-r.tension)/240,.1,.9):clamp((r.chemistry+r.friendship+25-r.tension)/160,.15,.9))*(taken?(kind==='flirt'?.75:.6):1);
   if(roll(s)>chance){r.spaceUntil=new Date(Date.parse(d+'T12:00:00Z')+7*86400000).toISOString().slice(0,10);memory(s,p,r,'A boundary respected',`${p.name} is not interested right now and asks for some space.`);return true}
  }
  if(['date','outing','walk','hookup'].includes(kind)){s.energy-=20;if(kind!=='walk')s.money-=s.year<1980?5:s.year<2000?20:40;r.friendship=clamp(r.friendship+8+(traits.preference===kind?4:0),-100,100);r.tension=clamp(r.tension-12);r.lastQuality=d}
  if(kind==='date'||kind==='reconcile'){r.dating=true;if(!s.overhaulVersion||!['committed','cohabiting','engaged','married'].includes(r.status))r.status='dating';r.chemistry=clamp(r.chemistry+8);r.commitment=clamp(r.commitment+10)}
  else if(kind==='hookup'){r.chemistry=clamp(r.chemistry+10)}
- else if(kind==='commit'){r.status='committed';r.commitment=clamp(r.commitment+20)}
- else if(kind==='breakup'){r.dating=false;r.status='ex';r.commitment=0;r.tension=clamp(r.tension+20);r.spaceUntil=new Date(Date.parse(d+'T12:00:00Z')+21*86400000).toISOString().slice(0,10)}
+ else if(kind==='commit'){r.status='committed';r.affair=false;r.commitment=clamp(r.commitment+20)}
+ else if(kind==='breakup'){r.dating=false;r.affair=false;r.status='ex';r.commitment=0;r.tension=clamp(r.tension+20);r.spaceUntil=new Date(Date.parse(d+'T12:00:00Z')+21*86400000).toISOString().slice(0,10)}
  else if(kind==='public'){if(traits.privacy&&!r.public&&r.commitment<40){memory(s,p,r,'Keeping things private','Your partner prefers privacy until the relationship feels more secure.');return true}r.public=!r.public}
  else if(kind==='apologise'){r.tension=clamp(r.tension-Math.min(gain,3));r.friendship=clamp(r.friendship+Math.min(gain,2),-100,100);p.rivalry=clamp((p.rivalry||0)-Math.min(gain,3))}
  else if(small){r.friendship=clamp(r.friendship+gain,-100,100);if(kind==='career'||kind==='set')r.respect=clamp(r.respect+Math.min(gain,3));if(kind==='flirt')r.chemistry=clamp(r.chemistry+Math.min(gain,6));if(kind==='friend'||kind==='set')r.chemistry=clamp(r.chemistry+Math.min(gain,3))}

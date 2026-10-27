@@ -1,9 +1,9 @@
 // v1.6 spin-offs, revivals and legacy sequels. Every production created here is
 // an explicitly fictional, alternate-timeline project owned by this save.
-import {active,currentDate,uniqueName} from './engine.js?v=16';
-import {characterKey,makeOffer,careerProfile} from './career.js?v=16';
-import {personAge} from './relationships.js?v=16';
-import {plusDays,daysBetween,random,ensureOverhaul,offeredFee} from './game-rules.js?v=16';
+import {active,currentDate,uniqueName} from './engine.js?v=17';
+import {characterKey,makeOffer,careerProfile} from './career.js?v=17';
+import {personAge} from './relationships.js?v=17';
+import {plusDays,daysBetween,random,ensureOverhaul,offeredFee} from './game-rules.js?v=17';
 
 const all=(s,c)=>[...new Map([...c,...s.projects].map(p=>[p.id,p])).values()];
 const find=(s,c,id)=>all(s,c).find(p=>p.id===id);

@@ -10,7 +10,7 @@ const project=(id,extra={})=>({id,title:id,year:2020,kind:'Film',director:'Direc
  await page.route('**/data/casting-history/years/*.json.gz',r=>r.fulfill({body:gzipSync(JSON.stringify({projects:{}}))}));
  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));
  const get=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('second-take-save-v1')));
- const put=fn=>page.evaluate(async src=>{const e=await import('./engine.js?v=16'),L=await import('./life.js?v=16'),S=await import('./spinoffs.js?v=16'),s=JSON.parse(localStorage.getItem(e.SAVE_KEY));await (new Function('s','e','L','S',src))(s,e,L,S);localStorage.setItem(e.SAVE_KEY,JSON.stringify(s))},fn);
+ const put=fn=>page.evaluate(async src=>{const e=await import('./engine.js?v=17'),L=await import('./life.js?v=17'),S=await import('./spinoffs.js?v=17'),s=JSON.parse(localStorage.getItem(e.SAVE_KEY));await (new Function('s','e','L','S',src))(s,e,L,S);localStorage.setItem(e.SAVE_KEY,JSON.stringify(s))},fn);
  const idle=()=>page.waitForFunction(()=>!document.querySelector('#ageButton')?.disabled,{timeout:60000});
  const settle=async()=>{for(let i=0;i<40;i++){await idle();if(await page.locator('.result-modal').count()){await page.locator('.result-modal [data-ok]').click();continue}const m=page.locator('.life-event-modal');if(await m.count()){await m.locator('[data-life-answer]').last().click();continue}break}};
 

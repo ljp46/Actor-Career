@@ -1,8 +1,9 @@
-import {active,available,currentDate,projectSchedule,roleFit,projectPhase,ensurePerson,person,uniqueName,castFor,rand} from './engine.js?v=16';
-import {ensureCareer,careerProfile,pendingOffers,makeOffer,startAudition,attendCallback,offerConflict,resolveProductionEvent,prepareAudition,acceptCareerOffer,declineCareerOffer} from './career.js?v=16';
-import {resolveLifeChoice,continueAs} from './life.js?v=16';
-import {bond,personality,personAge,romanceAllowed,interact} from './relationships.js?v=16';
-import {ensureOverhaul,roleAssessment,projectReach,typecastPressure,knownFor,dateOf,plusDays,daysBetween,limit,fingerprint,feed,queueEvent,openLifeEvent,castingReason,syncCalendar,reserve,calendarReason,economyTick,assets,eraValue,lifestyles,monthlyCosts,characterIdentity,assetValue} from './game-rules.js?v=16';
+import {active,available,currentDate,projectSchedule,roleFit,projectPhase,ensurePerson,person,uniqueName,castFor,rand} from './engine.js?v=17';
+import {ensureCareer,careerProfile,pendingOffers,makeOffer,startAudition,attendCallback,offerConflict,resolveProductionEvent,prepareAudition,acceptCareerOffer,declineCareerOffer} from './career.js?v=17';
+import {resolveLifeChoice,continueAs} from './life.js?v=17';
+import {inPrison,noteCheating,resolveVice,recordPenalty,exclusivePartners,isTaken} from './vice.js?v=17';
+import {bond,personality,personAge,romanceAllowed,interact} from './relationships.js?v=17';
+import {ensureOverhaul,roleAssessment,projectReach,typecastPressure,knownFor,dateOf,plusDays,daysBetween,limit,fingerprint,feed,queueEvent,openLifeEvent,castingReason,syncCalendar,reserve,calendarReason,economyTick,assets,eraValue,lifestyles,monthlyCosts,characterIdentity,assetValue} from './game-rules.js?v=17';
 
 const all=(s,c)=>[...new Map([...c,...s.projects].map(p=>[p.id,p])).values()];
 const production=(s,c,id)=>all(s,c).find(p=>p.id===id);
@@ -20,7 +21,7 @@ export function migrateOverhaul(s,catalogue){
  return s;
 }
 export function applyRole(s,catalogue,p,index,{watch=false}={}){
- ensureOverhaul(s);if(!p?.roles[index]||s.complete)throw Error('This role is unavailable.');
+ ensureOverhaul(s);if(!p?.roles[index]||s.complete)throw Error('This role is unavailable.');if(inPrison(s))throw Error('You cannot audition from prison.');
  if(roleFit(s,p,p.roles[index])<=50)throw Error('Applications require more than 50% fit.');
  const taken=castingReason(s,p,index);if(taken)throw Error(taken);
  const phase=projectPhase(s,p);if(watch&&phase!=='Announced'||!watch&&phase!=='Casting')throw Error(watch?'This project is not announced.':'Casting is not open.');
@@ -48,7 +49,7 @@ export function applicationTick(s,catalogue){
    queueEvent(s,'casting',a.status==='considering'?'Casting has opened':'Your watched role is unavailable',`${p.title} · ${a.character}. ${a.status==='considering'?'Your registered interest is now an application.':'The part is taken or its schedule no longer fits.'}`,[choice('ack','Continue')],{applicationId:a.id},`watch-${a.id}`);
   }
   if(a.status==='considering'&&date>=a.readyOn){
-   const score=roleFit(s,p,p.roles[a.index])*.28+s.skills.acting*.22+profile.reputation*.22+(profile.agent?.level||0)*4+s.fame*.12+((s.lifeStats?.[s.activeId]?.looks??50)-50)*.06-typecastPressure(s,p,a.index);
+   const score=roleFit(s,p,p.roles[a.index])*.28+s.skills.acting*.22+profile.reputation*.22+(profile.agent?.level||0)*4+s.fame*.12+((s.lifeStats?.[s.activeId]?.looks??50)-50)*.06-recordPenalty(s)-typecastPressure(s,p,a.index);
    if(!eligible.has(`${p.id}:${a.index}`)||rand(s)>limit(score/100,.12,.9)){a.status='rejected';feed(s,'Application decision',`${p.title} is not inviting you to audition for ${a.character}.`)}
    else{a.status='invited';queueEvent(s,'casting','An audition invitation',`${p.title} wants to see you for ${a.character}. Audition now, or prepare first from Career.`,[choice('submit','Audition now'),choice('ack','Prepare first')],{applicationId:a.id},`invited-${a.id}`)}
   }
@@ -75,14 +76,15 @@ export function featuredOpportunities(s,catalogue){
 export function socialProfile(s,p){
  const h=fingerprint(p.name);p.lifePersonality??={affection:25+h%71,independence:20+(h>>>3)%76,ambition:20+(h>>>7)%76,jealousy:10+(h>>>11)%76,humour:20+(h>>>15)%76,intention:['long-term','casual','undecided'][h%3]};
  if(!p.socialLife){const age=personAge(s,p),taken=!p.relative&&age>=13&&h%5===0;p.socialLife={status:taken?(age<18||h%2?'dating':'married'):'single',partnerName:taken?['Alex','Taylor','Jamie','Robin'][h%4]+' '+['Hayes','Ward','Price','Chen'][(h>>>3)%4]:null,lastChange:currentDate(s)}}
- const r=bond(s,p);if(r.dating){p.socialLife.partnerId=s.activeId;p.socialLife.partnerName=active(s).name;p.socialLife.status=r.status==='dating'?'dating':r.status}else if(p.socialLife.partnerId===s.activeId)p.socialLife={status:'single',partnerName:null,lastChange:currentDate(s)};
+ const r=bond(s,p);if(r.dating&&!r.affair){p.socialLife.partnerId=s.activeId;p.socialLife.partnerName=active(s).name;p.socialLife.status=r.status==='dating'?'dating':r.status}else if(p.socialLife.partnerId===s.activeId)p.socialLife={status:'single',partnerName:null,lastChange:currentDate(s)};
  r.trust??=Math.max(20,r.friendship*.7);r.affection??=r.dating?40:0;r.compatibility??=35+(fingerprint(active(s).name+':'+p.name)%61);r.datingSince??=r.dating?r.met||currentDate(s):null;
  return p.lifePersonality;
 }
 export function socialAction(s,catalogue,p,kind){
  const traits=socialProfile(s,p),r=bond(s,p),date=currentDate(s),adult=romanceAllowed(s,p,{adult:true});
  if(['holiday','move-in','engage','marry'].includes(kind)&&(!adult||!r.dating))throw Error('These decisions require an adult relationship.');
- if(['flirt','date','hookup','reconcile'].includes(kind)&&p.socialLife.status!=='single'&&!r.dating)throw Error(`${p.name} is already ${p.socialLife.status}.`);
+ if(['flirt','date','hookup','reconcile'].includes(kind)&&p.socialLife.status!=='single'&&p.socialLife.partnerId!==s.activeId&&!r.dating&&!adult)throw Error(`${p.name} is already ${p.socialLife.status}.`);
+ if(inPrison(s)&&['holiday','move-in','marry','date','hookup','outing','walk'].includes(kind))throw Error('You are in prison. Conversations happen during visits.');
  if(kind==='holiday'){
   const reason=calendarReason(s,date,plusDays(date,7));if(reason)throw Error(reason);if(p.busyUntil>date)throw Error('They are busy with work.');const cost=Math.round(1800*eraValue(s.year));if(s.money<cost)throw Error(`A holiday costs $${cost}.`);
   s.money-=cost;reserve(s,{id:`trip-${s.nextId++}`,title:`Holiday with ${p.name}`,start:date,end:plusDays(date,7),kind:'holiday',guestId:p.id});r.trust=limit(r.trust+8);r.affection=limit(r.affection+10);r.tension=limit(r.tension-20);r.lastQuality=date;remember(s,p,'A shared holiday','You make room in both your lives for time away together.');return 7;
@@ -105,8 +107,9 @@ export function socialAction(s,catalogue,p,kind){
   else{const gain=r.compatibility>=60?5:2;r.trust=limit(r.trust+gain);r.friendship=limit(r.friendship+gain,-100,100);if(r.dating){r.affection=limit(r.affection+gain);s.health=limit(s.health+1);r.lastQuality=date;r.tension=limit(r.tension-6)}remember(s,p,{future:'Talking about the future',boundaries:'Discussing boundaries',family:'Family stories',hobby:'A shared interest',quiet:'A quiet evening',support:'Showing up for them'}[kind],traits.intention==='casual'&&kind==='future'?'They value your connection but are unsure about a long-term commitment.':kind==='support'?'You listen to what they need instead of assuming every problem needs fixing.':'You learn something about their priorities and share your own. Compatibility grows through experiences, not just attraction.')}
   return 0;
  }
- const before={dating:r.dating,public:r.public,status:r.status};if(!interact(s,p,kind,{onSet:kind==='set'}))throw Error('This interaction is unavailable. Check their boundaries, age, energy or commitments.');
- if(r.dating&&!before.dating){r.datingSince=date;p.socialLife={status:'dating',partnerId:s.activeId,partnerName:active(s).name,lastChange:date};r.affection=limit(r.affection+15)}
+ const before={dating:r.dating,public:r.public,status:r.status,space:r.spaceUntil},theirsTaken=isTaken(s,p),cheating=theirsTaken||exclusivePartners(s,p).length>0;if(!interact(s,p,kind,{onSet:kind==='set'}))throw Error('This interaction is unavailable. Check their boundaries, age, energy or commitments.');
+ if(r.dating&&!before.dating){r.datingSince=date;r.affection=limit(r.affection+15);if(cheating){r.affair=true;r.status='affair'}else p.socialLife={status:'dating',partnerId:s.activeId,partnerName:active(s).name,lastChange:date}}
+ if(cheating&&['flirt','date','hookup','outing'].includes(kind)&&r.spaceUntil===before.space&&(kind!=='outing'||r.dating))noteCheating(s,p,kind);
  if(kind==='breakup'){p.socialLife={status:'single',partnerName:null,lastChange:date};r.cohabiting=false;r.trust=limit(r.trust-15)}
  if(kind==='commit'&&r.status==='committed')p.socialLife.status='exclusive';
  if(['walk','outing','date'].includes(kind)){r.trust=limit(r.trust+3);r.affection=limit(r.affection+3);if(kind!=='walk')s.publicSightings.push({from:s.activeId,with:p.id,date,type:'outing'})}
@@ -118,6 +121,7 @@ export function meetThrough(s,catalogue,route){
  if(modern&&(age<18||s.year<(route==='raya'?2015:2012)))throw Error('This app is unavailable in this era or at this age.');
  if(route==='raya'&&s.fame<50&&(careerProfile(s).agent?.level||0)<2)throw Error('This selective network requires 50 fame or established representation.');
  if(['party','industry','premiere'].includes(route)&&age<18)throw Error('These adult events are unavailable at your age.');
+ if(inPrison(s))throw Error('You cannot meet new people from prison.');
  if(s.energy<20)throw Error('You need 20 energy.');
  const dateEnd=plusDays(date,1),reason=['party','industry','premiere'].includes(route)?calendarReason(s,date,dateEnd):'';if(reason)throw Error(reason);
  const cost=modern||['community','introduction','personal-ad'].includes(route)?0:Math.round((route==='premiere'?300:100)*eraValue(s.year));if(s.money<cost)throw Error(`This event costs $${cost}.`);
@@ -190,6 +194,7 @@ export function resolveLifeEvent(s,catalogue,id,answer,{guestId=null}={}){
  else if(e.type==='casting'&&answer==='submit'){const out=submitAudition(s,catalogue,e.data.applicationId);e.outcome=out.stage==='offer'?'They loved it. An offer is on its way.':out.stage==='callback'?'You got a callback. The final decision comes soon.':'It did not go your way this time.'}
  else if(e.type==='legacy'){if(answer.startsWith('heir:')){continueAs(s,answer.slice(5));e.outcome='The story continues.'}else{s.awaitingHeir=false;e.outcome='This life is complete.'}}
  else if(['life','health','family'].includes(e.type)){e.outcome=resolveLifeChoice(s,catalogue,e,answer)}
+ else if(['crime','affair'].includes(e.type)){e.outcome=resolveVice(s,catalogue,e,answer)}
  e.status='resolved';e.answer=answer;e.resolvedOn=date;profile.lastChoice=date;feed(s,e.title,e.outcome||`You chose: ${e.options.find(o=>o.id===answer).label}.`);return e.outcome||'';
 }
 export function nextScheduledDate(s,end){return s.commitments.filter(c=>c.personId===s.activeId&&c.status==='scheduled'&&c.start>currentDate(s)&&c.start<=end).map(c=>c.start).sort()[0]||end}
@@ -268,5 +273,5 @@ export function overhaulTick(s,catalogue){
  relationshipEvents(s,catalogue);rumourTick(s);publicityTick(s,catalogue);directOffers(s,catalogue);recastTick(s,catalogue);
  s.publicSightings=s.publicSightings.filter(e=>daysBetween(e.date,currentDate(s))<120).slice(-80);s.commitments=s.commitments.filter(c=>c.status==='scheduled'||daysBetween(c.end,currentDate(s))<90);
 }
-export function buyAsset(s,id){const a=assets.find(a=>a.id===id);if(!a||personAge(s,active(s))<a.minAge||s.year<(a.minYear||1960))throw Error('This purchase is unavailable.');const price=Math.round(a.price*eraValue(s.year));if(s.money<price)throw Error('You do not have enough money.');if(s.possessions.some(p=>p.id===id&&p.ownerId===s.activeId))throw Error('You already own this asset.');s.money-=price;s.possessions.push({id:a.id,name:a.name,year:s.year,ownerId:s.activeId,paid:price});feed(s,'A purchase',`${a.name}: $${price.toLocaleString()}. Its upkeep is included in your living costs.`)}
+export function buyAsset(s,id){if(inPrison(s))throw Error('You cannot go shopping from prison.');const a=assets.find(a=>a.id===id);if(!a||personAge(s,active(s))<a.minAge||s.year<(a.minYear||1960))throw Error('This purchase is unavailable.');const price=Math.round(a.price*eraValue(s.year));if(s.money<price)throw Error('You do not have enough money.');if(s.possessions.some(p=>p.id===id&&p.ownerId===s.activeId))throw Error('You already own this asset.');s.money-=price;s.possessions.push({id:a.id,name:a.name,year:s.year,ownerId:s.activeId,paid:price});feed(s,'A purchase',`${a.name}: $${price.toLocaleString()}. Its upkeep is included in your living costs.`)}
 export function sellAsset(s,id){const index=s.possessions.findIndex(p=>p.id===id&&p.ownerId===s.activeId);if(index<0)throw Error('You do not own this asset.');const owned=s.possessions[index],value=assetValue(s,owned);s.money+=value;s.possessions.splice(index,1);feed(s,'An asset sold',`${owned.name}: $${value.toLocaleString()}. Its ongoing costs stop.`);return value}
